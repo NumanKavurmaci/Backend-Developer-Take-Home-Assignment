@@ -353,6 +353,10 @@ newStart < existingEnd AND newEnd > existingStart
 - Validation is implemented in custom application logic.
 - No external validation library is used for the overlap algorithm.
 
+### Implementation Status
+
+Implemented in `src/live-channel/epg-program/` and enforced before EPG persistence. Concurrency-safe scheduling remains a separate later step.
+
 ---
 
 ## 16. Back-to-Back EPG Scheduling

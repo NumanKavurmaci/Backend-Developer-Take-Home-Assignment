@@ -6,7 +6,7 @@ The CMS EPG endpoint lets operators create scheduled live programs for a channel
 POST /api/v1/cms/channels/{channelId}/epg
 ```
 
-This step creates programs and validates basic request shape, channel existence, date parsing, and time range. EPG overlap validation and concurrency protection are planned in later assignment steps.
+This endpoint creates programs and validates basic request shape, channel existence, date parsing, time range, and channel-scoped EPG overlap. Concurrency protection is planned in a later assignment step.
 
 ## Request
 
@@ -144,6 +144,25 @@ Example response:
 }
 ```
 
+### EPG Overlap
+
+The API rejects a new program when it overlaps an existing program on the same channel:
+
+```text
+newStart < existingEnd AND newEnd > existingStart
+```
+
+Back-to-back programs are allowed because the overlap rule uses strict inequalities.
+
+Example response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "EPG program overlaps with an existing schedule on this channel."
+}
+```
+
 ### Missing Channel
 
 Example request:
@@ -199,14 +218,15 @@ HTTP request
   -> controller reads route param and JSON body
   -> service validates request and checks channel existence
   -> domain validates and normalizes create input
+  -> repository checks same-channel overlap
   -> repository writes EpgProgram through Prisma
   -> controller returns 201 with the created record
 ```
 
 Date-time validation happens before the channel lookup and before repository writes, so invalid request values fail without creating an EPG record.
+Overlap validation happens after channel existence is confirmed and before the repository insert.
 
 ## Current Limitations
 
 - Duplicate exact schedules currently rely on the database unique constraint and are handled in later EPG validation work.
-- Overlap validation is not part of this step.
 - Concurrency-safe scheduling is not part of this step.

@@ -146,6 +146,35 @@ describe("CMS EPG program API routes", () => {
     expect(response.status).toBe(400);
   });
 
+  it("returns a client error when the program overlaps an existing schedule", async () => {
+    const createProgram = vi.fn().mockRejectedValue(
+      new HTTPException(400, {
+        message: "EPG program overlaps with an existing schedule on this channel.",
+      }),
+    );
+
+    const response = await createTestApp({ createProgram }).request(
+      "/api/v1/cms/channels/channel-saat-news/epg",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          programName: "Evening News",
+          startTime: "2026-07-02T18:30:00Z",
+          endTime: "2026-07-02T19:30:00Z",
+        }),
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "REQUEST_FAILED",
+      message: "EPG program overlaps with an existing schedule on this channel.",
+    });
+    expect(response.status).toBe(400);
+  });
+
   it("returns a consistent 404 response when the channel is missing", async () => {
     const createProgram = vi.fn().mockRejectedValue(
       new HTTPException(404, {

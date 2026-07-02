@@ -34,9 +34,7 @@ export function assertValidEpgProgramTimeRange(
   }
 }
 
-export function assertValidEpgProgramInput(
-  input: CreateEpgProgramInput,
-): void {
+export function assertValidEpgProgramInput(input: CreateEpgProgramInput): void {
   if (!normalizeEpgProgramChannelId(input.channelId)) {
     throw new EpgProgramValidationError("EPG program channelId is required.");
   }

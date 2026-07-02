@@ -16,9 +16,10 @@ The project focuses on the core domain problems from the case study: content met
 | Live channel and EPG models | Channel-scoped EPG program storage                                             |
 | CMS EPG creation API        | `POST /api/v1/cms/channels/{channelId}/epg`                                    |
 | EPG date-time validation    | Required fields, strict ISO date-time parsing, UTC normalization, range checks |
+| EPG overlap validation      | Custom channel-scoped overlap checks before persistence                        |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-EPG overlap validation, concurrency-safe scheduling, and playback entitlement rules are tracked as later assignment steps in `docs/project/project-steps.md`.
+Concurrency-safe scheduling and playback entitlement rules are tracked as later assignment steps in `docs/project/project-steps.md`.
 
 ## Tech Stack
 
@@ -199,6 +200,7 @@ The API validates the schedule before writing anything to the database:
 - `startTime` must be before `endTime`.
 - `startTime` and `endTime` must include timezone information.
 - Valid date-time values are normalized to UTC before range validation and persistence.
+- New programs must not overlap existing programs on the same channel.
 - Validation failures return a client error and do not create an EPG record.
 
 ### Date-time Handling
@@ -229,6 +231,16 @@ These two ranges represent the same schedule:
   "endTime": "2026-07-02T22:00:00+03:00"
 }
 ```
+
+### Overlap Validation
+
+The endpoint rejects overlapping programs on the same channel using custom application logic:
+
+```text
+newStart < existingEnd AND newEnd > existingStart
+```
+
+Back-to-back programs are allowed, so a program ending at `11:00` and another starting at `11:00` do not overlap. The same time range is also allowed on different channels.
 
 ### Successful EPG Creation
 
@@ -310,6 +322,25 @@ Response:
 {
   "errorCode": "REQUEST_FAILED",
   "message": "Channel not found"
+}
+```
+
+### EPG Overlap
+
+Overlapping schedules on the same channel return `400 Bad Request`.
+
+```bash
+curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Content-Type: application/json" \
+  -d '{"programName":"Overlapping News","startTime":"2026-07-02T18:30:00Z","endTime":"2026-07-02T19:30:00Z"}'
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "EPG program overlaps with an existing schedule on this channel."
 }
 ```
 

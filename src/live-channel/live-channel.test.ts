@@ -223,4 +223,118 @@ describe("live channel repository", () => {
       endTime: new Date("2026-07-02T19:00:00.000Z"),
     });
   });
+
+  it("rejects an EPG program that overlaps an existing program on the same channel", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+    await createEpgProgram(prisma, {
+      id: "epg-news-hour",
+      channelId: "channel-saat-news",
+      programName: "News Hour",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    await expect(
+      createEpgProgram(prisma, {
+        id: "epg-overlapping-news",
+        channelId: "channel-saat-news",
+        programName: "Overlapping News",
+        startTime: new Date("2026-07-02T18:30:00.000Z"),
+        endTime: new Date("2026-07-02T19:30:00.000Z"),
+      }),
+    ).rejects.toThrow(
+      "EPG program overlaps with an existing schedule on this channel.",
+    );
+  });
+
+  it("allows back-to-back EPG programs on the same channel", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+    await createEpgProgram(prisma, {
+      id: "epg-news-hour",
+      channelId: "channel-saat-news",
+      programName: "News Hour",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    await expect(
+      createEpgProgram(prisma, {
+        id: "epg-late-news",
+        channelId: "channel-saat-news",
+        programName: "Late News",
+        startTime: new Date("2026-07-02T19:00:00.000Z"),
+        endTime: new Date("2026-07-02T20:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      id: "epg-late-news",
+    });
+  });
+
+  it("allows an EPG program that ends exactly when an existing program starts", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+    await createEpgProgram(prisma, {
+      id: "epg-news-hour",
+      channelId: "channel-saat-news",
+      programName: "News Hour",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    await expect(
+      createEpgProgram(prisma, {
+        id: "epg-early-news",
+        channelId: "channel-saat-news",
+        programName: "Early News",
+        startTime: new Date("2026-07-02T17:00:00.000Z"),
+        endTime: new Date("2026-07-02T18:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      id: "epg-early-news",
+    });
+  });
+
+  it("allows the same EPG time range on different channels", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+    await createLiveChannel(prisma, {
+      id: "channel-saat-sports",
+      name: "Saat Sports",
+      slug: "saat-sports",
+    });
+    await createEpgProgram(prisma, {
+      id: "epg-news-hour",
+      channelId: "channel-saat-news",
+      programName: "News Hour",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    await expect(
+      createEpgProgram(prisma, {
+        id: "epg-sports-hour",
+        channelId: "channel-saat-sports",
+        programName: "Sports Hour",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      }),
+    ).resolves.toMatchObject({
+      id: "epg-sports-hour",
+      channelId: "channel-saat-sports",
+    });
+  });
 });

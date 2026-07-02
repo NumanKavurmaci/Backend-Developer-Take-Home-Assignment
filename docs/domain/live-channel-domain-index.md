@@ -45,7 +45,7 @@ LiveChannel
 
 ## EPG Program Subdomain
 
-EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for later overlap validation and concurrency protection.
+EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for overlap validation and future concurrency protection.
 
 ### `epg-program-types.ts`
 
@@ -70,6 +70,7 @@ EPG programs are stored under `src/live-channel/epg-program/` because they are s
 | Export              | Purpose |
 | ------------------- | ------- |
 | `createEpgProgram`  | Validates and normalizes create input, then inserts an `EpgProgram` row through Prisma. |
+| `assertNoOverlappingEpgProgram` | Checks for a same-channel row matching `newStart < existingEnd AND newEnd > existingStart` before writes. |
 
 The repository intentionally calls `prepareEpgProgramCreateInput(...)` even when the CMS service has already validated input. This protects the persistence boundary if another future use case calls the repository directly.
 
@@ -98,6 +99,7 @@ HTTP request
   -> controller
   -> service
   -> EPG domain validation
+  -> channel-scoped overlap validation
   -> EPG repository
   -> Prisma EpgProgram insert
 ```
@@ -111,7 +113,7 @@ Current step boundaries:
 | Missing channel returns `404` | implemented |
 | Invalid date strings return `400` | implemented |
 | Invalid time ranges return `400` | implemented |
-| Overlap validation | later step |
+| Overlap validation | implemented |
 | Concurrency-safe creation | later step |
 
 ## `live-channel.ts`
@@ -212,5 +214,8 @@ Current tests cover:
 - EPG program name and channel ID normalization.
 - Invalid EPG date values.
 - Invalid EPG time ranges where `startTime >= endTime`.
+- EPG overlap rejection on the same channel.
+- Back-to-back EPG programs.
+- Same EPG time range on different channels.
 
-The EPG overlap endpoint and concurrency tests are planned separately in the project plan.
+Concurrency tests are planned separately in the project plan.
