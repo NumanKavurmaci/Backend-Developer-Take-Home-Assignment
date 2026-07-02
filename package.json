@@ -8,11 +8,15 @@
     "typecheck": "tsc --noEmit",
     "db:setup": "tsx scripts/db-setup.ts",
     "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
     "db:migrate": "tsx scripts/db-setup.ts",
     "db:migrate:prisma": "prisma migrate dev",
     "db:reset": "tsx scripts/db-setup.ts --reset",
     "db:studio": "prisma studio",
     "db:check": "tsx src/db/check.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "engines": {
     "node": ">=20"

@@ -241,6 +241,12 @@ Create the local database:
 npm run db:setup
 ```
 
+Load sample data:
+
+```bash
+npm run db:seed
+```
+
 Check the database connection:
 
 ```bash
@@ -258,3 +264,20 @@ Open Prisma Studio:
 ```bash
 npm run db:studio
 ```
+
+## Seed Data
+
+The seed script creates data for the main assignment scenarios.
+
+| Scenario | Seed Data |
+| --- | --- |
+| Series hierarchy | `series-galactic-odyssey` -> `season-galactic-odyssey-s1` -> episode records |
+| Metadata inheritance | `episode-galactic-odyssey-s1e1` inherits from its Season and Series |
+| Season override | `season-galactic-odyssey-s1` overrides the Series genre |
+| Episode override | `episode-galactic-odyssey-s1e2` overrides parental rating and playback URL |
+| Geo-block inheritance | `series-galactic-odyssey` blocks `IR` and `SY`; `season-galactic-odyssey-s1`, `s1e1`, and `s1e2` inherit that list |
+| Geo-block override | `episode-galactic-odyssey-s1e3` overrides with an empty country list, so it does not inherit the Series block list |
+| Geo-blocking | `movie-crystal-frontier` blocks `TR` and `DE` |
+| Device restriction | `episode-galactic-odyssey-s1e3` and `movie-crystal-frontier` are premium `UHD_4K` assets |
+| EPG scheduling | `channel-saat-news` has existing back-to-back programs |
+| Channel-scoped EPG | `channel-saat-sports` has a program at the same time as the news channel |
