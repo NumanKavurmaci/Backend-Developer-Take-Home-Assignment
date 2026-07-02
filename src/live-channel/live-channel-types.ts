@@ -1,4 +1,5 @@
 import type { LiveChannel } from "@prisma/client";
+import type { EpgProgramRecord } from "./epg-program/epg-program-types.js";
 
 export type LiveChannelId = string;
 
@@ -9,15 +10,7 @@ export type CreateLiveChannelInput = {
 };
 
 export type LiveChannelWithPrograms = LiveChannel & {
-  epgPrograms: {
-    id: string;
-    channelId: string;
-    programName: string;
-    startTime: Date;
-    endTime: Date;
-    createdAt: Date;
-    updatedAt: Date;
-  }[];
+  epgPrograms: EpgProgramRecord[];
 };
 
 export type LiveChannelWithScheduleLock = LiveChannel & {

@@ -12,6 +12,10 @@ src/live-channel/
   live-channel-types.ts
   live-channel-repository.ts
   live-channel.test.ts
+  epg-program/
+    epg-program.ts
+    epg-program-types.ts
+    epg-program.test.ts
 ```
 
 ## Main Model
@@ -36,6 +40,7 @@ LiveChannel
 | `live-channel-types.ts`      | Defines live-channel input and read model TypeScript types.                                                                  |
 | `live-channel-repository.ts` | Handles Prisma reads and writes for channels, programs, and schedule-lock lookup.                                            |
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
+| `epg-program/`               | Defines scheduled-program input validation, including invalid date and invalid time-range rejection.                         |
 
 ## `live-channel.ts`
 
@@ -132,5 +137,8 @@ Current tests cover:
 - Lookup by ID and normalized slug.
 - Stable channel listing order.
 - EPG program loading scoped to a single channel.
+- EPG program name and channel ID normalization.
+- Invalid EPG date values.
+- Invalid EPG time ranges where `startTime >= endTime`.
 
 The EPG overlap endpoint and concurrency tests are planned separately in the project plan.
