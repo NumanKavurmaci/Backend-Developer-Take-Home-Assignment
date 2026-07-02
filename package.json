@@ -1,0 +1,31 @@
+{
+  "name": "saatcms-middleware-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SaatCMS OTT middleware core prototype.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "db:setup": "tsx scripts/db-setup.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "tsx scripts/db-setup.ts",
+    "db:migrate:prisma": "prisma migrate dev",
+    "db:reset": "tsx scripts/db-setup.ts --reset",
+    "db:studio": "prisma studio",
+    "db:check": "tsx src/db/check.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.0",
+    "@types/sql.js": "^1.4.11",
+    "prisma": "5.22.0",
+    "sql.js": "^1.14.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}

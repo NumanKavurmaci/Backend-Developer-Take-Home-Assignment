@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Content {
+  id    String @id @default(cuid())
+  /// Allowed values are SERIES, SEASON, EPISODE, and MOVIE.
+  type  String
+  title String
+
+  parentId String?
+  parent   Content?  @relation("ContentHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children Content[] @relation("ContentHierarchy")
+
+  /// Nullable metadata fields mean "inherit this field from the nearest parent".
+  parentalRating String?
+  genre          String?
+  /// Allowed values are SD, HD, and UHD_4K.
+  quality        String?
+  isPremium      Boolean?
+  playbackUrl    String?
+
+  /// false = inherit parent geo-block list; true = use rows in ContentGeoBlockCountry.
+  geoBlockCountriesOverride Boolean                  @default(false)
+  geoBlockCountries         ContentGeoBlockCountry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([parentId])
+  @@index([parentId, type])
+}
+
+model ContentGeoBlockCountry {
+  contentId   String
+  countryCode String
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@id([contentId, countryCode])
+  @@index([countryCode])
+}
+
+model LiveChannel {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  epgPrograms  EpgProgram[]
+  scheduleLock EpgScheduleLock?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model EpgProgram {
+  id          String   @id @default(cuid())
+  channelId   String
+  programName String
+  startTime   DateTime
+  endTime     DateTime
+
+  channel LiveChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([channelId, startTime, endTime])
+  @@index([channelId, startTime, endTime])
+  @@index([channelId, endTime])
+}
+
+model EpgScheduleLock {
+  channelId String @id
+  version   Int    @default(0)
+
+  channel LiveChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+}
