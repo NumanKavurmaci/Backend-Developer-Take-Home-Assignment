@@ -9,6 +9,8 @@ const rootDir = path.resolve(
   "..",
 );
 const reset = process.argv.includes("--reset");
+const DATABASE_URL_ENV_LINE_PATTERN =
+  /^DATABASE_URL=(?:"([^"]+)"|'([^']+)'|(.+))$/m;
 
 // Reads DATABASE_URL without needing dotenv for this small setup script.
 async function readDatabaseUrlFromEnvFile(): Promise<string | undefined> {
@@ -19,7 +21,7 @@ async function readDatabaseUrlFromEnvFile(): Promise<string | undefined> {
   }
 
   const envText = await readFile(envPath, "utf8");
-  const match = envText.match(/^DATABASE_URL=(?:"([^"]+)"|'([^']+)'|(.+))$/m);
+  const match = envText.match(DATABASE_URL_ENV_LINE_PATTERN);
   return match?.[1] ?? match?.[2] ?? match?.[3]?.trim();
 }
 
