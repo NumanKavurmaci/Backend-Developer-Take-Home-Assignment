@@ -396,4 +396,50 @@ describe("live channel repository", () => {
       channelId: "channel-saat-news",
     });
   });
+
+  it("allows concurrent EPG creation for different channels", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+
+    await createLiveChannel(prisma, {
+      id: "channel-saat-sports",
+      name: "Saat Sports",
+      slug: "saat-sports",
+    });
+
+    const results = await Promise.allSettled([
+      createEpgProgramWithConcurrencyLock(prisma, {
+        id: "epg-news-hour",
+        channelId: "channel-saat-news",
+        programName: "News Hour",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      }),
+      createEpgProgramWithConcurrencyLock(prisma, {
+        id: "epg-sports-hour",
+        channelId: "channel-saat-sports",
+        programName: "Sports Hour",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      }),
+    ]);
+
+    expect(results).toEqual([
+      expect.objectContaining({ status: "fulfilled" }),
+      expect.objectContaining({ status: "fulfilled" }),
+    ]);
+
+    const programs = await prisma.epgProgram.findMany({
+      orderBy: [{ channelId: "asc" }, { startTime: "asc" }],
+    });
+
+    expect(programs).toHaveLength(2);
+    expect(programs.map((program) => program.channelId).sort()).toEqual([
+      "channel-saat-news",
+      "channel-saat-sports",
+    ]);
+  });
 });
