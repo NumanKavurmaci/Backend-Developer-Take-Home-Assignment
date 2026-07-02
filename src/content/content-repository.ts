@@ -38,6 +38,8 @@ export class ContentGeoBlockError extends Error {
   }
 }
 
+const ISO_3166_ALPHA_2_COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+
 export function normalizeGeoBlockCountries(
   geoBlockCountries: string[] = [],
 ): string[] {
@@ -46,7 +48,7 @@ export function normalizeGeoBlockCountries(
   );
 
   const invalidCountryCode = normalized.find(
-    (countryCode) => !/^[A-Z]{2}$/.test(countryCode),
+    (countryCode) => !ISO_3166_ALPHA_2_COUNTRY_CODE_PATTERN.test(countryCode),
   );
 
   if (invalidCountryCode !== undefined) {

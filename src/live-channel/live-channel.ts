@@ -1,5 +1,7 @@
 import type { CreateLiveChannelInput } from "./live-channel-types.js";
 
+const LIVE_CHANNEL_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export function normalizeLiveChannelName(name: string): string {
   return name.trim();
 }
@@ -22,7 +24,7 @@ export function assertValidLiveChannelInput(
     throw new Error("Live channel slug is required");
   }
 
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) {
+  if (!LIVE_CHANNEL_SLUG_PATTERN.test(slug)) {
     throw new Error(
       "Live channel slug must contain lowercase letters, numbers, and hyphens only",
     );
