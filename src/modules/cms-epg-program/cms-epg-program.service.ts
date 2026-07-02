@@ -5,7 +5,7 @@ import {
   EpgProgramValidationError,
   prepareEpgProgramCreateInput,
 } from "../../live-channel/epg-program/epg-program.js";
-import { createEpgProgram } from "../../live-channel/epg-program/epg-program-repository.js";
+import { createEpgProgramWithConcurrencyLock } from "../../live-channel/epg-program/epg-program-repository.js";
 import type {
   CreateEpgProgramInput,
   EpgProgramRecord,
@@ -31,7 +31,7 @@ export class CmsEpgProgramService {
     await assertChannelExists(createInput.channelId);
 
     return mapEpgProgramValidationError(() =>
-      createEpgProgram(prisma, createInput),
+      createEpgProgramWithConcurrencyLock(prisma, createInput),
     );
   }
 }

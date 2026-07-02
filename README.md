@@ -17,9 +17,10 @@ The project focuses on the core domain problems from the case study: content met
 | CMS EPG creation API        | `POST /api/v1/cms/channels/{channelId}/epg`                                    |
 | EPG date-time validation    | Required fields, strict ISO date-time parsing, UTC normalization, range checks |
 | EPG overlap validation      | Custom channel-scoped overlap checks before persistence                        |
+| EPG concurrency safety      | Transactional per-channel schedule-lock flow                                   |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-Concurrency-safe scheduling and playback entitlement rules are tracked as later assignment steps in `docs/project/project-steps.md`.
+Playback entitlement rules are tracked as later assignment steps in `docs/project/project-steps.md`.
 
 ## Tech Stack
 
@@ -203,6 +204,19 @@ The API validates the schedule before writing anything to the database:
 - New programs must not overlap existing programs on the same channel.
 - Validation failures return a client error and do not create an EPG record.
 
+### Concurrency Strategy
+
+EPG creation uses a transaction plus the `EpgScheduleLock` row that belongs to the target channel.
+
+The write flow is:
+
+````text
+start transaction
+  -> update EpgScheduleLock for the requested channel
+  -> check overlaps for that channel
+  -> insert EpgProgram if no overlap exists
+commit transaction
+
 ### Date-time Handling
 
 The assignment calls out UTC handling, so the endpoint accepts only unambiguous ISO 8601 date-time values.
@@ -223,7 +237,7 @@ These two ranges represent the same schedule:
   "startTime": "2026-07-02T18:00:00Z",
   "endTime": "2026-07-02T19:00:00Z"
 }
-```
+````
 
 ```json
 {

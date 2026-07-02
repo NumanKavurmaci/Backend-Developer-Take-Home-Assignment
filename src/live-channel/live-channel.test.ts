@@ -14,7 +14,10 @@ import {
   getLiveChannelWithScheduleLock,
   listLiveChannels,
 } from "./live-channel-repository.js";
-import { createEpgProgram } from "./epg-program/epg-program-repository.js";
+import {
+  createEpgProgram,
+  createEpgProgramWithConcurrencyLock,
+} from "./epg-program/epg-program-repository.js";
 
 const prisma = new PrismaClient();
 
@@ -335,6 +338,62 @@ describe("live channel repository", () => {
     ).resolves.toMatchObject({
       id: "epg-sports-hour",
       channelId: "channel-saat-sports",
+    });
+  });
+
+  it("allows only one of two concurrent overlapping EPG programs on the same channel", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+
+    const results = await Promise.allSettled([
+      createEpgProgramWithConcurrencyLock(prisma, {
+        id: "epg-breaking-news",
+        channelId: "channel-saat-news",
+        programName: "Breaking News",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      }),
+      createEpgProgramWithConcurrencyLock(prisma, {
+        id: "epg-overlapping-news",
+        channelId: "channel-saat-news",
+        programName: "Overlapping News",
+        startTime: new Date("2026-07-02T18:30:00.000Z"),
+        endTime: new Date("2026-07-02T19:30:00.000Z"),
+      }),
+    ]);
+
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+
+    const rejectedResult = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+
+    expect(rejectedResult?.reason).toMatchObject({
+      message:
+        "EPG program overlaps with an existing schedule on this channel.",
+    });
+
+    const programs = await prisma.epgProgram.findMany({
+      where: {
+        channelId: "channel-saat-news",
+      },
+      orderBy: {
+        startTime: "asc",
+      },
+    });
+
+    expect(programs).toHaveLength(1);
+    expect(programs[0]).toMatchObject({
+      channelId: "channel-saat-news",
     });
   });
 });

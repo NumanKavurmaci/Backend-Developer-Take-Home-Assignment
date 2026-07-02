@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import {
   EpgProgramValidationError,
   prepareEpgProgramCreateInput,
@@ -8,8 +8,10 @@ import type {
   EpgProgramRecord,
 } from "./epg-program-types.js";
 
+type EpgProgramPrismaClient = PrismaClient | Prisma.TransactionClient;
+
 export async function createEpgProgram(
-  prisma: PrismaClient,
+  prisma: EpgProgramPrismaClient,
   input: CreateEpgProgramInput,
 ): Promise<EpgProgramRecord> {
   const data = prepareEpgProgramCreateInput(input);
@@ -26,8 +28,38 @@ export async function createEpgProgram(
   });
 }
 
-export async function assertNoOverlappingEpgProgram(
+/**
+ * Touch the channel lock row before checking overlaps.
+ * This makes concurrent writes for the same channel run one after another,
+ * so the second request sees the first request's inserted program.
+ */
+export async function createEpgProgramWithConcurrencyLock(
   prisma: PrismaClient,
+  input: CreateEpgProgramInput,
+): Promise<EpgProgramRecord> {
+  const data = prepareEpgProgramCreateInput(input);
+
+  return prisma.$transaction(async (transaction) => {
+    await transaction.epgScheduleLock.upsert({
+      where: {
+        channelId: data.channelId,
+      },
+      update: {
+        version: {
+          increment: 1,
+        },
+      },
+      create: {
+        channelId: data.channelId,
+      },
+    });
+
+    return createEpgProgram(transaction, data);
+  });
+}
+
+export async function assertNoOverlappingEpgProgram(
+  prisma: EpgProgramPrismaClient,
   input: CreateEpgProgramInput,
 ): Promise<void> {
   const data = prepareEpgProgramCreateInput(input);
