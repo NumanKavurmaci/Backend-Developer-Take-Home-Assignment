@@ -15,6 +15,7 @@ src/live-channel/
   epg-program/
     epg-program.ts
     epg-program-types.ts
+    epg-program-repository.ts
     epg-program.test.ts
 ```
 
@@ -40,7 +41,7 @@ LiveChannel
 | `live-channel-types.ts`      | Defines live-channel input and read model TypeScript types.                                                                  |
 | `live-channel-repository.ts` | Handles Prisma reads and writes for channels, programs, and schedule-lock lookup.                                            |
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
-| `epg-program/`               | Defines scheduled-program input validation, including invalid date and invalid time-range rejection.                         |
+| `epg-program/`               | Defines scheduled-program input validation, creation types, repository writes, invalid date checks, and invalid time-range rejection. |
 
 ## `live-channel.ts`
 

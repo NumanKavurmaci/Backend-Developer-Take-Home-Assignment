@@ -155,6 +155,82 @@ Example response:
 }
 ```
 
+## CMS EPG Program API
+
+### Create an EPG program
+
+```http
+POST /api/v1/cms/channels/{channelId}/epg
+```
+
+Creates a scheduled live program for an existing channel.
+
+Example:
+
+```bash
+curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Content-Type: application/json" \
+  -d '{"programName":"Evening News","startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
+```
+
+Response:
+
+```http
+HTTP/1.1 201 Created
+```
+
+```json
+{
+  "id": "clx...",
+  "channelId": "channel-saat-news",
+  "programName": "Evening News",
+  "startTime": "2026-07-02T18:00:00.000Z",
+  "endTime": "2026-07-02T19:00:00.000Z",
+  "createdAt": "2026-07-02T17:00:00.000Z",
+  "updatedAt": "2026-07-02T17:00:00.000Z"
+}
+```
+
+Missing required fields return `400 Bad Request`.
+
+Example:
+
+```bash
+curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Content-Type: application/json" \
+  -d '{"startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "programName is required"
+}
+```
+
+Missing channels return `404 Not Found`.
+
+Example:
+
+```bash
+curl -i -X POST http://localhost:3000/api/v1/cms/channels/missing-channel/epg \
+  -H "Content-Type: application/json" \
+  -d '{"programName":"Evening News","startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "Channel not found"
+}
+```
+
+This step validates required fields and creates the program. EPG overlap and concurrency protection are implemented in later assignment steps.
+
 ## Checks
 
 Run TypeScript checks:

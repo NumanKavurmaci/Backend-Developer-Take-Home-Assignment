@@ -14,6 +14,7 @@ import {
   getLiveChannelWithScheduleLock,
   listLiveChannels,
 } from "./live-channel-repository.js";
+import { createEpgProgram } from "./epg-program/epg-program-repository.js";
 
 const prisma = new PrismaClient();
 
@@ -197,5 +198,29 @@ describe("live channel repository", () => {
       "news-earlier",
       "news-later",
     ]);
+  });
+
+  it("creates an EPG program for an existing channel", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+
+    const program = await createEpgProgram(prisma, {
+      id: "epg-evening-news",
+      channelId: "channel-saat-news",
+      programName: " Evening News ",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    expect(program).toMatchObject({
+      id: "epg-evening-news",
+      channelId: "channel-saat-news",
+      programName: "Evening News",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
   });
 });
