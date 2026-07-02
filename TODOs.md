@@ -1,3 +1,3 @@
-# step 9: Metadata Inheritance Test Cases
+# TODOs
 
-1. Completely Missing
+No open TODOs.

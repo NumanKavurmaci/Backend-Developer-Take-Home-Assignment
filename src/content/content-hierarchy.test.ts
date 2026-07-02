@@ -837,6 +837,223 @@ describe("metadata inheritance engine", () => {
   });
 });
 
+describe("metadata inheritance test cases", () => {
+  it("lets an Episode inherit all metadata fields from its Series", async () => {
+    await createContent(prisma, {
+      id: "series-all-fields",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series All Fields",
+      parentalRating: "13+",
+      genre: "Mystery",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-all/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    await createContent(prisma, {
+      id: "season-inherits-all",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Inherits All",
+      parentId: "series-all-fields",
+    });
+    await createContent(prisma, {
+      id: "episode-inherits-all",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Inherits All",
+      parentId: "season-inherits-all",
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "episode-inherits-all"),
+    ).resolves.toEqual({
+      contentId: "episode-inherits-all",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Inherits All",
+      parentalRating: "13+",
+      genre: "Mystery",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-all/default.m3u8",
+      geoBlockCountries: ["IR", "SY"],
+    });
+  });
+
+  it("lets an Episode inherit metadata fields overridden by its Season", async () => {
+    await createContent(prisma, {
+      id: "series-season-overrides",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Season Overrides",
+      parentalRating: "13+",
+      genre: "Drama",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-season/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR"],
+    });
+    await createContent(prisma, {
+      id: "season-overrides",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Overrides",
+      parentId: "series-season-overrides",
+      parentalRating: "16+",
+      genre: "Thriller",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/season-overrides/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["TR"],
+    });
+    await createContent(prisma, {
+      id: "episode-uses-season-overrides",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Uses Season Overrides",
+      parentId: "season-overrides",
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "episode-uses-season-overrides"),
+    ).resolves.toMatchObject({
+      parentalRating: "16+",
+      genre: "Thriller",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/season-overrides/default.m3u8",
+      geoBlockCountries: ["TR"],
+    });
+  });
+
+  it("gives Episode metadata priority over Season and Series metadata", async () => {
+    await createContent(prisma, {
+      id: "series-episode-priority",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Episode Priority",
+      parentalRating: "13+",
+      genre: "Drama",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-priority/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR"],
+    });
+    await createContent(prisma, {
+      id: "season-episode-priority",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Episode Priority",
+      parentId: "series-episode-priority",
+      parentalRating: "16+",
+      genre: "Thriller",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/season-priority/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["TR"],
+    });
+    await createContent(prisma, {
+      id: "episode-priority",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Priority",
+      parentId: "season-episode-priority",
+      parentalRating: "18+",
+      genre: "Finale",
+      quality: VIDEO_QUALITIES.SD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/episode-priority/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["DE"],
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "episode-priority"),
+    ).resolves.toMatchObject({
+      parentalRating: "18+",
+      genre: "Finale",
+      quality: VIDEO_QUALITIES.SD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/episode-priority/default.m3u8",
+      geoBlockCountries: ["DE"],
+    });
+  });
+
+  it("resolves mixed inheritance across fields and preserves explicit false values", async () => {
+    await createContent(prisma, {
+      id: "series-mixed-step-nine",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Mixed Step Nine",
+      parentalRating: "13+",
+      genre: "Adventure",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/series-mixed-step-nine/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    await createContent(prisma, {
+      id: "season-mixed-step-nine",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Mixed Step Nine",
+      parentId: "series-mixed-step-nine",
+      genre: "Space Adventure",
+      isPremium: false,
+    });
+    await createContent(prisma, {
+      id: "episode-mixed-step-nine",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Mixed Step Nine",
+      parentId: "season-mixed-step-nine",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      playbackUrl: "https://cdn.saatcms.test/episode-mixed-step-nine/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: [],
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "episode-mixed-step-nine"),
+    ).resolves.toMatchObject({
+      parentalRating: "13+",
+      genre: "Space Adventure",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/episode-mixed-step-nine/default.m3u8",
+      geoBlockCountries: [],
+    });
+  });
+
+  it("returns a not-found error when resolving missing content metadata", async () => {
+    await expect(
+      resolveContentMetadata(prisma, "missing-step-nine-content"),
+    ).rejects.toMatchObject({
+      errorCode: "CONTENT_NOT_FOUND",
+      statusCode: 404,
+    });
+  });
+
+  it("rejects invalid hierarchy data before resolving metadata", async () => {
+    await prisma.content.create({
+      data: {
+        id: "step-nine-series",
+        type: CONTENT_TYPES.SERIES,
+        title: "Step Nine Series",
+      },
+    });
+    await prisma.content.create({
+      data: {
+        id: "step-nine-invalid-episode",
+        type: CONTENT_TYPES.EPISODE,
+        title: "Step Nine Invalid Episode",
+        parentId: "step-nine-series",
+      },
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "step-nine-invalid-episode"),
+    ).rejects.toThrow(
+      "EPISODE content must belong to a SEASON, but parent step-nine-series is SERIES.",
+    );
+  });
+});
+
 describe("geo-block input rules", () => {
   it("normalizes and deduplicates country codes", () => {
     expect(normalizeGeoBlockCountries([" tr ", "TR", "de"])).toEqual([
