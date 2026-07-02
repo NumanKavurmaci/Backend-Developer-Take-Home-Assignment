@@ -29,6 +29,10 @@ import {
   MAX_CONTENT_HIERARCHY_DEPTH,
   normalizeGeoBlockCountries,
 } from "./content-repository.js";
+import {
+  ContentNotFoundError,
+  resolveContentMetadata,
+} from "./metadata-inheritance.js";
 
 const prisma = new PrismaClient();
 
@@ -583,6 +587,253 @@ describe("content hierarchy queries", () => {
     ).rejects.toThrow(
       `Content hierarchy exceeds max depth of ${MAX_CONTENT_HIERARCHY_DEPTH}.`,
     );
+  });
+});
+
+describe("metadata inheritance engine", () => {
+  async function createInheritanceTree() {
+    await createContent(prisma, {
+      id: "series-inheritance",
+      type: CONTENT_TYPES.SERIES,
+      title: "Inheritance Series",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    await createContent(prisma, {
+      id: "season-inheritance",
+      type: CONTENT_TYPES.SEASON,
+      title: "Inheritance Season",
+      parentId: "series-inheritance",
+      parentalRating: "16+",
+      genre: "Space Adventure",
+    });
+    await createContent(prisma, {
+      id: "episode-inheritance",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Inheritance Episode",
+      parentId: "season-inheritance",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      playbackUrl: "https://cdn.saatcms.test/episode/override.m3u8",
+    });
+  }
+
+  it("resolves final Episode metadata with Episode -> Season -> Series priority", async () => {
+    await createInheritanceTree();
+
+    const metadata = await resolveContentMetadata(
+      prisma,
+      "episode-inheritance",
+    );
+
+    expect(metadata).toEqual({
+      contentId: "episode-inheritance",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Inheritance Episode",
+      parentalRating: "16+",
+      genre: "Space Adventure",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/episode/override.m3u8",
+      geoBlockCountries: ["IR", "SY"],
+    });
+  });
+
+  it("gives Episode-level values highest priority", async () => {
+    await createInheritanceTree();
+    await createContent(prisma, {
+      id: "episode-full-override",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Full Override",
+      parentId: "season-inheritance",
+      parentalRating: "18+",
+      genre: "Finale",
+      quality: VIDEO_QUALITIES.SD,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/episode/full-override.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["TR"],
+    });
+
+    const metadata = await resolveContentMetadata(
+      prisma,
+      "episode-full-override",
+    );
+
+    expect(metadata).toMatchObject({
+      parentalRating: "18+",
+      genre: "Finale",
+      quality: VIDEO_QUALITIES.SD,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/episode/full-override.m3u8",
+      geoBlockCountries: ["TR"],
+    });
+  });
+
+  it("uses Season values when Episode values are missing", async () => {
+    await createInheritanceTree();
+    await createContent(prisma, {
+      id: "episode-season-fallback",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Season Fallback",
+      parentId: "season-inheritance",
+    });
+
+    const metadata = await resolveContentMetadata(
+      prisma,
+      "episode-season-fallback",
+    );
+
+    expect(metadata.parentalRating).toBe("16+");
+    expect(metadata.genre).toBe("Space Adventure");
+  });
+
+  it("uses Series values when Episode and Season values are missing", async () => {
+    await createContent(prisma, {
+      id: "series-only-defaults",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Only Defaults",
+      parentalRating: "13+",
+      genre: "Drama",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-only/default.m3u8",
+    });
+    await createContent(prisma, {
+      id: "season-empty",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Empty",
+      parentId: "series-only-defaults",
+    });
+    await createContent(prisma, {
+      id: "episode-empty",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Empty",
+      parentId: "season-empty",
+    });
+
+    const metadata = await resolveContentMetadata(prisma, "episode-empty");
+
+    expect(metadata).toMatchObject({
+      parentalRating: "13+",
+      genre: "Drama",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-only/default.m3u8",
+    });
+  });
+
+  it("resolves each scalar metadata field independently", async () => {
+    await createContent(prisma, {
+      id: "series-mixed",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Mixed",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series-mixed/default.m3u8",
+    });
+    await createContent(prisma, {
+      id: "season-mixed",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Mixed",
+      parentId: "series-mixed",
+      genre: "Adventure",
+      isPremium: true,
+    });
+    await createContent(prisma, {
+      id: "episode-mixed",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Mixed",
+      parentId: "season-mixed",
+      quality: VIDEO_QUALITIES.UHD_4K,
+    });
+
+    const metadata = await resolveContentMetadata(prisma, "episode-mixed");
+
+    expect(metadata).toMatchObject({
+      parentalRating: "13+",
+      genre: "Adventure",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/series-mixed/default.m3u8",
+    });
+  });
+
+  it("keeps geo-block override with an empty list as the final value", async () => {
+    await createInheritanceTree();
+    await createContent(prisma, {
+      id: "episode-empty-geo-override",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Empty Geo Override",
+      parentId: "season-inheritance",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: [],
+    });
+
+    const metadata = await resolveContentMetadata(
+      prisma,
+      "episode-empty-geo-override",
+    );
+
+    expect(metadata.geoBlockCountries).toEqual([]);
+  });
+
+  it("returns a not-found error for missing content", async () => {
+    await expect(
+      resolveContentMetadata(prisma, "missing-content"),
+    ).rejects.toMatchObject({
+      name: "ContentNotFoundError",
+      errorCode: "CONTENT_NOT_FOUND",
+      statusCode: 404,
+    });
+    await expect(
+      resolveContentMetadata(prisma, "missing-content"),
+    ).rejects.toThrow(ContentNotFoundError);
+  });
+
+  it("rejects corrupted hierarchy data instead of resolving incorrect metadata", async () => {
+    await prisma.content.create({
+      data: {
+        id: "corrupt-series",
+        type: CONTENT_TYPES.SERIES,
+        title: "Corrupt Series",
+      },
+    });
+    await prisma.content.create({
+      data: {
+        id: "corrupt-episode",
+        type: CONTENT_TYPES.EPISODE,
+        title: "Corrupt Episode",
+        parentId: "corrupt-series",
+      },
+    });
+
+    await expect(
+      resolveContentMetadata(prisma, "corrupt-episode"),
+    ).rejects.toThrow(
+      "EPISODE content must belong to a SEASON, but parent corrupt-series is SERIES.",
+    );
+  });
+
+  it("loads geo-block rows for the whole path in one query", async () => {
+    await createInheritanceTree();
+
+    const findManySpy = vi.spyOn(prisma.contentGeoBlockCountry, "findMany");
+    const metadata = await resolveContentMetadata(
+      prisma,
+      "episode-inheritance",
+    );
+
+    expect(metadata.geoBlockCountries).toEqual(["IR", "SY"]);
+    expect(findManySpy).toHaveBeenCalledTimes(1);
+
+    findManySpy.mockRestore();
   });
 });
 

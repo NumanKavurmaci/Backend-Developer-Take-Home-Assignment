@@ -152,6 +152,27 @@ Playback rules can use:
 | `isPremium`         | marks assets that need stricter device rules |
 | `playbackUrl`       | returned only after entitlement checks pass  |
 
+## Metadata Inheritance
+
+Resolved metadata is calculated in one centralized content service.
+
+For scalar fields, the closest non-empty value wins:
+
+```text
+Episode -> Season -> Series
+```
+
+This rule is applied independently to each field. For example, an Episode can use its own `quality`, inherit `genre` from Season, and inherit `isPremium` from Series.
+
+Geo-block countries use the same closest-owner idea, but through the explicit `geoBlockCountriesOverride` flag:
+
+| Flag    | Meaning                                                              |
+| ------- | -------------------------------------------------------------------- |
+| `false` | keep looking at the parent                                           |
+| `true`  | use this content item's country rows, even when the list is empty    |
+
+The inheritance service validates the loaded hierarchy before resolving metadata. Corrupted data, such as an Episode directly under a Series, is rejected instead of producing a misleading result.
+
 ### `ContentGeoBlockCountry`
 
 Stores blocked countries for a content item.
