@@ -12,6 +12,7 @@ The project currently has:
 - Hono application scaffold
 - Health-check endpoint
 - Middleware content metadata endpoint with Series -> Season -> Episode inheritance
+- Focused tests for content hierarchy, metadata resolution, content metadata routing, and live-channel domain behavior
 
 ## Run Locally
 
@@ -167,3 +168,14 @@ Run tests:
 ```bash
 npm test
 ```
+
+## Documentation
+
+Additional project notes live under `docs/`:
+
+- `docs/api/content-metadata-api.md`
+- `docs/database-structure.md`
+- `docs/domain/content-domain-index.md`
+- `docs/domain/live-channel-domain-index.md`
+- `docs/project/assignment.md`
+- `docs/project/project-steps.md`
