@@ -97,6 +97,19 @@ The `parentId` column links one content item to its parent:
 
 The database stores the parent relationship. The application code will validate that the parent type is correct.
 
+Hierarchy validation lives in the content domain layer:
+
+| Content Type | Valid Parent |
+| ------------ | ------------ |
+| `SERIES`     | none         |
+| `SEASON`     | `SERIES`     |
+| `EPISODE`    | `SEASON`     |
+| `MOVIE`      | none         |
+
+Invalid combinations are rejected before writing to the database. For example, an `EPISODE` cannot be created directly under a `SERIES`.
+
+Ancestor path queries are loaded with one recursive SQLite query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
+
 ### Inherited Metadata
 
 These `Content` fields can be inherited:
@@ -269,15 +282,15 @@ npm run db:studio
 
 The seed script creates data for the main assignment scenarios.
 
-| Scenario | Seed Data |
-| --- | --- |
-| Series hierarchy | `series-galactic-odyssey` -> `season-galactic-odyssey-s1` -> episode records |
-| Metadata inheritance | `episode-galactic-odyssey-s1e1` inherits from its Season and Series |
-| Season override | `season-galactic-odyssey-s1` overrides the Series genre |
-| Episode override | `episode-galactic-odyssey-s1e2` overrides parental rating and playback URL |
+| Scenario              | Seed Data                                                                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Series hierarchy      | `series-galactic-odyssey` -> `season-galactic-odyssey-s1` -> episode records                                       |
+| Metadata inheritance  | `episode-galactic-odyssey-s1e1` inherits from its Season and Series                                                |
+| Season override       | `season-galactic-odyssey-s1` overrides the Series genre                                                            |
+| Episode override      | `episode-galactic-odyssey-s1e2` overrides parental rating and playback URL                                         |
 | Geo-block inheritance | `series-galactic-odyssey` blocks `IR` and `SY`; `season-galactic-odyssey-s1`, `s1e1`, and `s1e2` inherit that list |
-| Geo-block override | `episode-galactic-odyssey-s1e3` overrides with an empty country list, so it does not inherit the Series block list |
-| Geo-blocking | `movie-crystal-frontier` blocks `TR` and `DE` |
-| Device restriction | `episode-galactic-odyssey-s1e3` and `movie-crystal-frontier` are premium `UHD_4K` assets |
-| EPG scheduling | `channel-saat-news` has existing back-to-back programs |
-| Channel-scoped EPG | `channel-saat-sports` has a program at the same time as the news channel |
+| Geo-block override    | `episode-galactic-odyssey-s1e3` overrides with an empty country list, so it does not inherit the Series block list |
+| Geo-blocking          | `movie-crystal-frontier` blocks `TR` and `DE`                                                                      |
+| Device restriction    | `episode-galactic-odyssey-s1e3` and `movie-crystal-frontier` are premium `UHD_4K` assets                           |
+| EPG scheduling        | `channel-saat-news` has existing back-to-back programs                                                             |
+| Channel-scoped EPG    | `channel-saat-sports` has a program at the same time as the news channel                                           |

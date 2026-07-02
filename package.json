@@ -6,6 +6,7 @@
   "description": "SaatCMS OTT middleware core prototype.",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:setup": "tsx scripts/db-setup.ts",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
@@ -30,6 +31,7 @@
     "prisma": "5.22.0",
     "sql.js": "^1.14.1",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }
