@@ -2,7 +2,7 @@
 
 Prototype backend for the SaatCMS OTT middleware assignment.
 
-The project focuses on the core domain problems from the case study: content metadata inheritance, live-channel EPG scheduling validation, local persistence, repeatable seed data, and focused automated tests.
+The project focuses on the core domain problems from the case study: content metadata inheritance, live-channel EPG scheduling validation, playback request context, local persistence, repeatable seed data, and focused automated tests.
 
 ## What Is Implemented
 
@@ -13,6 +13,7 @@ The project focuses on the core domain problems from the case study: content met
 | Health check                | `GET /health`                                                                  |
 | Metadata inheritance        | `Series -> Season -> Episode` resolution                                       |
 | Content metadata API        | `GET /api/v1/mw/content/{contentId}`                                           |
+| Playback request headers    | `GET /api/v1/mw/playback/{contentId}` header validation                        |
 | Live channel and EPG models | Channel-scoped EPG program storage                                             |
 | CMS EPG creation API        | `POST /api/v1/cms/channels/{channelId}/epg`                                    |
 | EPG date-time validation    | Required fields, strict ISO date-time parsing, UTC normalization, range checks |
@@ -20,7 +21,7 @@ The project focuses on the core domain problems from the case study: content met
 | EPG concurrency safety      | Transactional per-channel schedule-lock flow                                   |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-Playback entitlement rules are tracked as later assignment steps in `docs/project/project-steps.md`.
+Playback entitlement, geofencing, and final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
 
 ## Tech Stack
 
@@ -184,6 +185,83 @@ HTTP/1.1 404 Not Found
 {
   "errorCode": "REQUEST_FAILED",
   "message": "Content not found"
+}
+```
+
+## Playback API
+
+```http
+GET /api/v1/mw/playback/{contentId}
+```
+
+The playback endpoint receives the request context needed for later entitlement checks. At the current stage, it validates the required headers and returns the normalized request context.
+
+Required headers:
+
+| Header           | Required | Example    |
+| ---------------- | -------- | ---------- |
+| `X-User-Id`      | Yes      | `user-123` |
+| `X-User-Country` | Yes      | `TR`       |
+| `X-Device-Type`  | Yes      | `Web`      |
+
+Supported device types are `Mobile`, `SmartTV`, and `Web`.
+
+### Successful Header Validation
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TR" \
+  -H "X-Device-Type: Web"
+```
+
+Current Step 21 response:
+
+```json
+{
+  "contentId": "episode-galactic-odyssey-s1e2",
+  "requestContext": {
+    "userId": "user-123",
+    "userCountry": "TR",
+    "deviceType": "Web"
+  }
+}
+```
+
+This temporary response is intentional: it makes header handling easy to verify before the later playback entitlement rules are added.
+
+### Missing Header
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "X-User-Id: user-123" \
+  -H "X-Device-Type: Web"
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "X-User-Country header is required"
+}
+```
+
+### Invalid Device Type
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TR" \
+  -H "X-Device-Type: Console"
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "X-Device-Type must be one of: Mobile, SmartTV, Web"
 }
 ```
 
@@ -357,6 +435,7 @@ src/
   modules/
     cms-epg-program/            CMS EPG HTTP module
     mw-content/                 Middleware content metadata HTTP module
+    mw-playback/                Middleware playback HTTP module
   shared/http/                  Shared HTTP error handling
   db/                           Prisma client and database checks
 docs/                           API, domain, database, and project planning notes
@@ -369,6 +448,7 @@ Detailed notes live under `docs/`:
 
 - `docs/api/content-metadata-api.md`
 - `docs/api/cms-epg-program-api.md`
+- `docs/api/mw-playback-api.md`
 - `docs/database-structure.md`
 - `docs/domain/content-domain-index.md`
 - `docs/domain/live-channel-domain-index.md`
