@@ -6,7 +6,7 @@ The CMS EPG endpoint lets operators create scheduled live programs for a channel
 POST /api/v1/cms/channels/{channelId}/epg
 ```
 
-This endpoint creates programs and validates basic request shape, channel existence, date parsing, time range, and channel-scoped EPG overlap. Concurrency protection is planned in a later assignment step.
+This endpoint validates request shape, channel existence, date parsing, time range, channel-scoped overlap, and concurrency-safe scheduling before saving an EPG program.
 
 ## Request
 
@@ -53,6 +53,41 @@ Date-time values without timezone information are rejected because their meaning
   "endTime": "2026-07-02T19:00:00"
 }
 ```
+
+## Scheduling Rules
+
+Overlap validation uses this predicate:
+
+```text
+newStart < existingEnd AND newEnd > existingStart
+```
+
+A new program is rejected only when that predicate is true for an existing program on the same channel.
+
+Back-to-back programs are allowed because the comparisons are strict:
+
+```text
+10:00-11:00
+11:00-12:00
+```
+
+The same time range is allowed on different channels because overlap validation is scoped by `channelId`.
+
+## Concurrency Strategy
+
+EPG creation uses a transaction and the `EpgScheduleLock` row for the requested channel.
+
+```text
+start transaction
+  -> touch EpgScheduleLock for the requested channel
+  -> check overlaps for that channel
+  -> insert EpgProgram if no overlap exists
+commit transaction
+```
+
+Concurrent writes for the same channel touch the same schedule-lock row. That makes the critical flow run one after another, so the second request sees the first request's inserted program before it can save a conflicting schedule.
+
+Different channels use different schedule-lock rows. This keeps the application strategy channel-scoped instead of using one global EPG lock. SQLite may still serialize writes broadly internally, but the model expresses the intended per-channel strategy clearly.
 
 ## Success Response
 
@@ -146,14 +181,6 @@ Example response:
 
 ### EPG Overlap
 
-The API rejects a new program when it overlaps an existing program on the same channel:
-
-```text
-newStart < existingEnd AND newEnd > existingStart
-```
-
-Back-to-back programs are allowed because the overlap rule uses strict inequalities.
-
 Example response:
 
 ```json
@@ -209,6 +236,7 @@ Example response:
 | Service    | `src/modules/cms-epg-program/cms-epg-program.service.ts`    |
 | Domain     | `src/live-channel/epg-program/epg-program.ts`               |
 | Repository | `src/live-channel/epg-program/epg-program-repository.ts`    |
+| Lock model | `EpgScheduleLock` in `prisma/schema.prisma`                 |
 
 Request flow:
 
@@ -218,15 +246,13 @@ HTTP request
   -> controller reads route param and JSON body
   -> service validates request and checks channel existence
   -> domain validates and normalizes create input
+  -> repository starts transaction
+  -> repository touches channel schedule-lock row
   -> repository checks same-channel overlap
   -> repository writes EpgProgram through Prisma
   -> controller returns 201 with the created record
 ```
 
 Date-time validation happens before the channel lookup and before repository writes, so invalid request values fail without creating an EPG record.
-Overlap validation happens after channel existence is confirmed and before the repository insert.
 
-## Current Limitations
-
-- Duplicate exact schedules currently rely on the database unique constraint and are handled in later EPG validation work.
-- Concurrency-safe scheduling is not part of this step.
+Overlap validation happens after channel existence is confirmed and inside the schedule-lock transaction.
