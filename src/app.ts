@@ -4,6 +4,7 @@ import { errorHandler, notFoundHandler } from "./shared/http/error-handler.js";
 import { HealthModule } from "./modules/health/health.module.js";
 import { CmsEpgProgramModule } from "./modules/cms-epg-program/cms-epg-program.module.js";
 import { MwContentModule } from "./modules/mw-content/mw-content.module.js";
+import { MwPlaybackModule } from "./modules/mw-playback/mw-playback.module.js";
 
 export function createApp() {
   const app = new Hono();
@@ -14,6 +15,7 @@ export function createApp() {
   HealthModule.register(app);
   MwContentModule.register(app);
   CmsEpgProgramModule.register(app);
+  MwPlaybackModule.register(app);
 
   return app;
 }
