@@ -10,6 +10,7 @@ data/*.db-wal
 # Build and coverage output
 dist/
 coverage/
+tmp/
 
 # OS/editor noise
 .DS_Store
