@@ -390,6 +390,16 @@ Program A: 10:00 - 11:00
 Program B: 10:30 - 12:00
 ```
 
+### Implementation Status
+
+Implemented through the same strict overlap predicate used by Step 15:
+
+```text
+newStart < existingEnd AND newEnd > existingStart
+```
+
+Because both comparisons are strict, schedules that only touch at a boundary are accepted in either order. Repository coverage exists for both back-to-back directions, and partial overlaps remain rejected.
+
 ---
 
 ## 17. EPG Concurrency Safety
