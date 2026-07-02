@@ -11,6 +11,15 @@ import {
   getAllowedParentType,
 } from "./content-hierarchy.js";
 import {
+  ContentMetadataError,
+  INHERITABLE_METADATA_FIELDS,
+  PLAYBACK_METADATA_FIELDS,
+  VIDEO_QUALITIES,
+  VIDEO_QUALITY_VALUES,
+  assertVideoQuality,
+  isVideoQuality,
+} from "./content-metadata.js";
+import {
   ContentGeoBlockError,
   createContent,
   getContentAncestorPath,
@@ -227,6 +236,205 @@ describe("content hierarchy rules", () => {
     ).rejects.toThrow("SEASON content must belong to a SERIES.");
 
     await expect(prisma.content.count()).resolves.toBe(0);
+  });
+});
+
+describe("inheritable metadata fields", () => {
+  it("documents all inheritable metadata fields required by the assignment", () => {
+    expect(INHERITABLE_METADATA_FIELDS).toEqual([
+      "parentalRating",
+      "genre",
+      "quality",
+      "isPremium",
+      "playbackUrl",
+      "geoBlockCountries",
+    ]);
+  });
+
+  it("documents metadata fields needed by playback rules", () => {
+    expect(PLAYBACK_METADATA_FIELDS).toEqual([
+      "quality",
+      "isPremium",
+      "playbackUrl",
+      "geoBlockCountries",
+    ]);
+  });
+
+  it("defines allowed video qualities", () => {
+    expect(VIDEO_QUALITY_VALUES).toEqual([
+      VIDEO_QUALITIES.SD,
+      VIDEO_QUALITIES.HD,
+      VIDEO_QUALITIES.UHD_4K,
+    ]);
+    expect(isVideoQuality("HD")).toBe(true);
+    expect(isVideoQuality("8K")).toBe(false);
+  });
+
+  it("rejects invalid video qualities before writing content", async () => {
+    expect(() => assertVideoQuality("8K")).toThrow(ContentMetadataError);
+
+    await expect(
+      createContent(prisma, {
+        id: "series-invalid-quality",
+        type: CONTENT_TYPES.SERIES,
+        title: "Invalid Quality Series",
+        // TypeScript callers cannot pass this value, but runtime input still can.
+        quality: "8K" as typeof VIDEO_QUALITIES.HD,
+      }),
+    ).rejects.toThrow("Invalid video quality \"8K\"");
+  });
+
+  it("lets a Series define default metadata values", async () => {
+    const series = await createContent(prisma, {
+      id: "series-defaults",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Defaults",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+      geoBlockCountriesOverride: true,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    const countries = await prisma.contentGeoBlockCountry.findMany({
+      where: { contentId: series.id },
+      orderBy: { countryCode: "asc" },
+    });
+
+    expect(series).toMatchObject({
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+      geoBlockCountriesOverride: true,
+    });
+    expect(countries.map((country) => country.countryCode)).toEqual([
+      "IR",
+      "SY",
+    ]);
+  });
+
+  it("lets a Season override selected metadata fields and leave others empty", async () => {
+    await createContent(prisma, {
+      id: "series-defaults",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Defaults",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+    });
+
+    const season = await createContent(prisma, {
+      id: "season-genre-override",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Genre Override",
+      parentId: "series-defaults",
+      genre: "Space Adventure",
+    });
+
+    expect(season).toMatchObject({
+      parentalRating: null,
+      genre: "Space Adventure",
+      quality: null,
+      isPremium: null,
+      playbackUrl: null,
+    });
+  });
+
+  it("lets an Episode override selected metadata fields independently", async () => {
+    await createContent(prisma, {
+      id: "series-defaults",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Defaults",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+    });
+    await createContent(prisma, {
+      id: "season-genre-override",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Genre Override",
+      parentId: "series-defaults",
+      genre: "Space Adventure",
+    });
+
+    const episode = await createContent(prisma, {
+      id: "episode-rating-and-playback-override",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Override",
+      parentId: "season-genre-override",
+      parentalRating: "16+",
+      playbackUrl: "https://cdn.saatcms.test/episode/override.m3u8",
+    });
+
+    expect(episode).toMatchObject({
+      parentalRating: "16+",
+      genre: null,
+      quality: null,
+      isPremium: null,
+      playbackUrl: "https://cdn.saatcms.test/episode/override.m3u8",
+    });
+  });
+
+  it("supports premium 4K metadata needed by device playback rules", async () => {
+    const movie = await createContent(prisma, {
+      id: "movie-premium-4k",
+      type: CONTENT_TYPES.MOVIE,
+      title: "Premium 4K Movie",
+      parentalRating: "18+",
+      genre: "Action",
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/movie/4k.m3u8",
+    });
+
+    expect(movie).toMatchObject({
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: true,
+      playbackUrl: "https://cdn.saatcms.test/movie/4k.m3u8",
+    });
+  });
+
+  it("keeps each metadata field independent from the others", async () => {
+    await createContent(prisma, {
+      id: "series-defaults",
+      type: CONTENT_TYPES.SERIES,
+      title: "Series Defaults",
+      parentalRating: "13+",
+      genre: "Sci-Fi",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/series/default.m3u8",
+    });
+    await createContent(prisma, {
+      id: "season-rating-only",
+      type: CONTENT_TYPES.SEASON,
+      title: "Season Rating Only",
+      parentId: "series-defaults",
+      parentalRating: "16+",
+    });
+
+    const episode = await createContent(prisma, {
+      id: "episode-quality-only",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Episode Quality Only",
+      parentId: "season-rating-only",
+      quality: VIDEO_QUALITIES.UHD_4K,
+    });
+
+    expect(episode).toMatchObject({
+      parentalRating: null,
+      genre: null,
+      quality: VIDEO_QUALITIES.UHD_4K,
+      isPremium: null,
+      playbackUrl: null,
+    });
   });
 });
 

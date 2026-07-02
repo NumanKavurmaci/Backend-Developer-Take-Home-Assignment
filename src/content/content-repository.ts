@@ -1,5 +1,9 @@
 import type { Content, Prisma, PrismaClient } from "@prisma/client";
 import { assertContentType, type ContentType } from "./content-types.js";
+import {
+  assertVideoQuality,
+  type VideoQuality,
+} from "./content-metadata.js";
 import { validateContentParent } from "./content-hierarchy.js";
 
 export type CreateContentInput = {
@@ -9,7 +13,7 @@ export type CreateContentInput = {
   parentId?: string | null;
   parentalRating?: string | null;
   genre?: string | null;
-  quality?: string | null;
+  quality?: VideoQuality | null;
   isPremium?: boolean | null;
   playbackUrl?: string | null;
   geoBlockCountriesOverride?: boolean;
@@ -58,6 +62,7 @@ export async function createContent(
   input: CreateContentInput,
 ): Promise<Content> {
   assertContentType(input.type);
+  assertVideoQuality(input.quality);
 
   const geoBlockCountriesOverride = input.geoBlockCountriesOverride ?? false;
   const geoBlockCountries = normalizeGeoBlockCountries(input.geoBlockCountries);

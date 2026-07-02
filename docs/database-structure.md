@@ -119,6 +119,7 @@ These `Content` fields can be inherited:
 - `quality`
 - `isPremium`
 - `playbackUrl`
+- `geoBlockCountries`
 
 The rule is simple:
 
@@ -138,7 +139,18 @@ Allowed `quality` values:
 - `HD`
 - `UHD_4K`
 
-SQLite stores `type` and `quality` as strings. The application code will validate the allowed values before saving data.
+SQLite stores `type` and `quality` as strings. The application code validates the allowed values before saving data.
+
+The assignment calls this field `premium`; the code stores it as `isPremium` so the boolean meaning is clear.
+
+Playback rules can use:
+
+| Field               | Why Playback Needs It                        |
+| ------------------- | -------------------------------------------- |
+| `geoBlockCountries` | blocks playback for selected countries       |
+| `quality`           | identifies premium 4K assets                 |
+| `isPremium`         | marks assets that need stricter device rules |
+| `playbackUrl`       | returned only after entitlement checks pass  |
 
 ### `ContentGeoBlockCountry`
 
