@@ -236,6 +236,8 @@ Important fields:
 | `startTime`   | UTC start time                |
 | `endTime`     | UTC end time                  |
 
+Seeded EPG schedules use explicit ISO UTC strings ending in `Z`. The seed script validates this convention before converting values to `Date` objects, so sample data cannot accidentally depend on the server's local timezone.
+
 Invalid ranges must be rejected:
 
 ```text

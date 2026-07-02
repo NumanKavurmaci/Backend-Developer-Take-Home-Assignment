@@ -14,6 +14,30 @@ const channelIds = {
   sports: "channel-saat-sports",
 } as const;
 
+const epgScheduleTimes = {
+  morningBriefingStart: "2026-07-02T08:00:00.000Z",
+  morningBriefingEnd: "2026-07-02T09:00:00.000Z",
+  marketWatchStart: "2026-07-02T09:00:00.000Z",
+  marketWatchEnd: "2026-07-02T10:00:00.000Z",
+} as const;
+
+const UTC_TIMESTAMP_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+function readSeedUtcDate(value: string): Date {
+  if (!UTC_TIMESTAMP_PATTERN.test(value)) {
+    throw new Error(`Seed EPG timestamp must be explicit UTC: ${value}`);
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Seed EPG timestamp is invalid: ${value}`);
+  }
+
+  return date;
+}
+
 async function clearExistingData() {
   await prisma.$transaction([
     prisma.epgProgram.deleteMany(),
@@ -125,14 +149,14 @@ async function seedLiveChannels() {
           {
             id: "epg-saat-news-morning-briefing",
             programName: "Morning Briefing",
-            startTime: new Date("2026-07-02T08:00:00.000Z"),
-            endTime: new Date("2026-07-02T09:00:00.000Z"),
+            startTime: readSeedUtcDate(epgScheduleTimes.morningBriefingStart),
+            endTime: readSeedUtcDate(epgScheduleTimes.morningBriefingEnd),
           },
           {
             id: "epg-saat-news-market-watch",
             programName: "Market Watch",
-            startTime: new Date("2026-07-02T09:00:00.000Z"),
-            endTime: new Date("2026-07-02T10:00:00.000Z"),
+            startTime: readSeedUtcDate(epgScheduleTimes.marketWatchStart),
+            endTime: readSeedUtcDate(epgScheduleTimes.marketWatchEnd),
           },
         ],
       },
@@ -154,8 +178,8 @@ async function seedLiveChannels() {
           {
             id: "epg-saat-sports-morning-briefing",
             programName: "Morning Briefing Simulcast",
-            startTime: new Date("2026-07-02T08:00:00.000Z"),
-            endTime: new Date("2026-07-02T09:00:00.000Z"),
+            startTime: readSeedUtcDate(epgScheduleTimes.morningBriefingStart),
+            endTime: readSeedUtcDate(epgScheduleTimes.morningBriefingEnd),
           },
         ],
       },

@@ -17,6 +17,9 @@ type CreateEpgProgramRequestBody = {
   endTime?: unknown;
 };
 
+const ISO_DATE_TIME_WITH_TIMEZONE_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/;
+
 // Coordinates request validation, channel existence checks, and EPG persistence.
 export class CmsEpgProgramService {
   async createProgram(
@@ -103,6 +106,14 @@ function readRequiredString(value: unknown, fieldName: string): string {
 
 function readRequiredDate(value: unknown, fieldName: string): Date {
   const rawValue = readRequiredString(value, fieldName);
+  const match = ISO_DATE_TIME_WITH_TIMEZONE_PATTERN.exec(rawValue);
+
+  if (!match || !hasValidDateTimeParts(match)) {
+    throw new HTTPException(400, {
+      message: `${fieldName} must be an ISO 8601 date-time string with timezone`,
+    });
+  }
+
   const date = new Date(rawValue);
 
   if (Number.isNaN(date.getTime())) {
@@ -112,4 +123,33 @@ function readRequiredDate(value: unknown, fieldName: string): Date {
   }
 
   return date;
+}
+
+function hasValidDateTimeParts(match: RegExpExecArray): boolean {
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const offsetHour = match[9] ? Number(match[9]) : 0;
+  const offsetMinute = match[10] ? Number(match[10]) : 0;
+
+  if (
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    offsetHour > 23 ||
+    offsetMinute > 59
+  ) {
+    return false;
+  }
+
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    calendarDate.getUTCFullYear() === year &&
+    calendarDate.getUTCMonth() === month - 1 &&
+    calendarDate.getUTCDate() === day
+  );
 }

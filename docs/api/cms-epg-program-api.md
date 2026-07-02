@@ -18,11 +18,11 @@ Path parameters:
 
 JSON body:
 
-| Field         | Required | Type   | Description                                                                         |
-| ------------- | -------- | ------ | ----------------------------------------------------------------------------------- |
-| `programName` | yes      | string | Human-readable program title.                                                       |
-| `startTime`   | yes      | string | Date-time string parsed as a JavaScript `Date`. UTC strings with `Z` are preferred. |
-| `endTime`     | yes      | string | Date-time string parsed as a JavaScript `Date`. Must be after `startTime`.          |
+| Field         | Required | Type   | Description                                                                  |
+| ------------- | -------- | ------ | ---------------------------------------------------------------------------- |
+| `programName` | yes      | string | Human-readable program title.                                                |
+| `startTime`   | yes      | string | ISO 8601 date-time string with timezone. UTC strings with `Z` are preferred. |
+| `endTime`     | yes      | string | ISO 8601 date-time string with timezone. Must be after `startTime`.          |
 
 Example:
 
@@ -31,6 +31,26 @@ Example:
   "programName": "Evening News",
   "startTime": "2026-07-02T18:00:00Z",
   "endTime": "2026-07-02T19:00:00Z"
+}
+```
+
+Offset date-time values are accepted and normalized to UTC before validation and persistence:
+
+```json
+{
+  "programName": "Evening News",
+  "startTime": "2026-07-02T21:00:00+03:00",
+  "endTime": "2026-07-02T22:00:00+03:00"
+}
+```
+
+Date-time values without timezone information are rejected because their meaning depends on the server timezone:
+
+```json
+{
+  "programName": "Evening News",
+  "startTime": "2026-07-02T18:00:00",
+  "endTime": "2026-07-02T19:00:00"
 }
 ```
 
@@ -107,7 +127,7 @@ Example response:
 ```json
 {
   "errorCode": "REQUEST_FAILED",
-  "message": "startTime must be a valid date-time string"
+  "message": "startTime must be an ISO 8601 date-time string with timezone"
 }
 ```
 
@@ -182,6 +202,8 @@ HTTP request
   -> repository writes EpgProgram through Prisma
   -> controller returns 201 with the created record
 ```
+
+Date-time validation happens before the channel lookup and before repository writes, so invalid request values fail without creating an EPG record.
 
 ## Current Limitations
 
