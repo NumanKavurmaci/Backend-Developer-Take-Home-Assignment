@@ -195,31 +195,19 @@ POST /api/v1/cms/channels/{channelId}/epg
 
 Creates a scheduled live program for an existing channel.
 
-The API validates the schedule before writing anything to the database:
+The endpoint validates the request before saving:
 
 - `programName`, `startTime`, and `endTime` are required.
 - `startTime` must be before `endTime`.
-- `startTime` and `endTime` must include timezone information.
-- Valid date-time values are normalized to UTC before range validation and persistence.
+- Date-time values must include timezone information.
+- Valid date-time values are normalized to UTC.
 - New programs must not overlap existing programs on the same channel.
-- Validation failures return a client error and do not create an EPG record.
+- Back-to-back programs are allowed.
+- EPG creation runs inside a transaction with a per-channel schedule lock.
 
-### Concurrency Strategy
+### Scheduling Rules
 
-EPG creation uses a transaction plus the `EpgScheduleLock` row that belongs to the target channel.
-
-The write flow is:
-
-````text
-start transaction
-  -> update EpgScheduleLock for the requested channel
-  -> check overlaps for that channel
-  -> insert EpgProgram if no overlap exists
-commit transaction
-
-### Date-time Handling
-
-The assignment calls out UTC handling, so the endpoint accepts only unambiguous ISO 8601 date-time values.
+Date-time values must be unambiguous ISO 8601 values.
 
 | Input                       | Result   | Reason                                                   |
 | --------------------------- | -------- | -------------------------------------------------------- |
@@ -228,33 +216,22 @@ The assignment calls out UTC handling, so the endpoint accepts only unambiguous 
 | `2026-07-02T18:00:00`       | Rejected | No timezone, so server timezone could change the meaning |
 | `2026-02-30T18:00:00Z`      | Rejected | Invalid calendar date                                    |
 
-UTC `Z` values are preferred in examples. Explicit offsets are also accepted and compared as UTC instants.
-
-These two ranges represent the same schedule:
-
-```json
-{
-  "startTime": "2026-07-02T18:00:00Z",
-  "endTime": "2026-07-02T19:00:00Z"
-}
-````
-
-```json
-{
-  "startTime": "2026-07-02T21:00:00+03:00",
-  "endTime": "2026-07-02T22:00:00+03:00"
-}
-```
-
-### Overlap Validation
-
-The endpoint rejects overlapping programs on the same channel using custom application logic:
+Overlap validation uses this rule:
 
 ```text
 newStart < existingEnd AND newEnd > existingStart
 ```
 
-Back-to-back programs are allowed, so a program ending at `11:00` and another starting at `11:00` do not overlap. The same time range is also allowed on different channels.
+Because both comparisons are strict, back-to-back schedules are valid:
+
+```text
+10:00-11:00
+11:00-12:00
+```
+
+Concurrency protection is scoped per channel. Before checking overlaps, the service touches the requested channel's `EpgScheduleLock` row inside the same transaction. Concurrent writes for the same channel pass through the same lock row, so the second request sees the first request's inserted program before it can save a conflicting schedule.
+
+Different channels use different lock rows, so the application-level strategy is channel-scoped instead of using one global EPG lock. SQLite may still serialize writes broadly internally, but the application models the intended per-channel strategy clearly.
 
 ### Successful EPG Creation
 
