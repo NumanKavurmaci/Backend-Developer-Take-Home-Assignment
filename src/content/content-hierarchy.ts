@@ -18,6 +18,7 @@ export function getAllowedParentType(type: ContentType): ContentType | null {
   return allowedParentByType[type];
 }
 
+// Enforces the CMS hierarchy before writes reach the self-referencing table.
 export function validateContentParent(
   type: ContentType,
   parent: { id: string; type: string } | null,

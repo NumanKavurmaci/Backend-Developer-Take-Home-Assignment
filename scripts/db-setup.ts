@@ -10,6 +10,7 @@ const rootDir = path.resolve(
 );
 const reset = process.argv.includes("--reset");
 
+// Reads DATABASE_URL without needing dotenv for this small setup script.
 async function readDatabaseUrlFromEnvFile(): Promise<string | undefined> {
   const envPath = path.join(rootDir, ".env");
 
@@ -22,6 +23,7 @@ async function readDatabaseUrlFromEnvFile(): Promise<string | undefined> {
   return match?.[1] ?? match?.[2] ?? match?.[3]?.trim();
 }
 
+// Prisma resolves SQLite file URLs from prisma/, so this mirrors that behavior.
 function resolveSqlitePath(databaseUrl: string): string {
   if (!databaseUrl.startsWith("file:")) {
     throw new Error(
@@ -33,6 +35,7 @@ function resolveSqlitePath(databaseUrl: string): string {
   return path.resolve(rootDir, "prisma", sqlitePath);
 }
 
+// Concatenates committed SQL migrations for the local sql.js database builder.
 async function readMigrationSql(): Promise<string> {
   const migrationsDir = path.join(rootDir, "prisma", "migrations");
   const migrationDirs = (await readdir(migrationsDir, { withFileTypes: true }))

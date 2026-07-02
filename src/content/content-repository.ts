@@ -28,6 +28,7 @@ export type ContentWithParent = Content & {
   parent: Content | null;
 };
 
+// Safety limit for corrupted or unexpectedly deep hierarchy data, not a business depth rule.
 export const MAX_CONTENT_HIERARCHY_DEPTH = 10;
 
 export class ContentGeoBlockError extends Error {
@@ -57,6 +58,16 @@ export function normalizeGeoBlockCountries(
   return [...new Set(normalized)];
 }
 
+function createGeoBlockCountryRows(geoBlockCountries: string[]) {
+  return geoBlockCountries.length > 0
+    ? {
+        create: geoBlockCountries.map((countryCode) => ({
+          countryCode,
+        })),
+      }
+    : undefined;
+}
+
 export async function createContent(
   prisma: PrismaClient,
   input: CreateContentInput,
@@ -82,15 +93,6 @@ export async function createContent(
 
   validateContentParent(input.type, parent);
 
-  const _geoBlockCountries =
-    geoBlockCountries.length > 0
-      ? {
-          create: geoBlockCountries.map((countryCode) => ({
-            countryCode,
-          })),
-        }
-      : undefined;
-
   return prisma.content.create({
     data: {
       id: input.id,
@@ -103,7 +105,7 @@ export async function createContent(
       isPremium: input.isPremium,
       playbackUrl: input.playbackUrl,
       geoBlockCountriesOverride,
-      geoBlockCountries: _geoBlockCountries,
+      geoBlockCountries: createGeoBlockCountryRows(geoBlockCountries),
     },
   });
 }
@@ -137,6 +139,7 @@ type ContentAncestorRow = Content & {
   hasCycle: number | boolean;
 };
 
+// Loads the full parent path in one query to avoid one query per hierarchy level.
 export async function getContentAncestorPath(
   prisma: PrismaClient,
   contentId: string,
@@ -149,6 +152,7 @@ export async function getContentAncestorPath(
   return rows.map(toContent);
 }
 
+// Recursive SQLite CTE walks upward from the requested content to its root parent.
 async function fetchContentAncestorRows(
   prisma: PrismaClient,
   contentId: string,
@@ -237,6 +241,7 @@ async function fetchContentAncestorRows(
   `;
 }
 
+// Protects later metadata resolution from corrupted parent cycles.
 function assertAncestorPathHasNoCycle(rows: ContentAncestorRow[]): void {
   const cycleRow = rows.find((row) => Boolean(row.hasCycle));
 
@@ -245,6 +250,7 @@ function assertAncestorPathHasNoCycle(rows: ContentAncestorRow[]): void {
   }
 }
 
+// Stops traversal from silently accepting hierarchy data beyond the supported safety window.
 function assertAncestorPathIsWithinDepthLimit(
   rows: ContentAncestorRow[],
 ): void {

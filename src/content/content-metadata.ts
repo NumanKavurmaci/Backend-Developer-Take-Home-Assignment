@@ -10,6 +10,7 @@ export const INHERITABLE_METADATA_FIELDS = [
 export type InheritableMetadataField =
   (typeof INHERITABLE_METADATA_FIELDS)[number];
 
+// Playback authorization depends on these resolved fields, so they are tracked explicitly.
 export const PLAYBACK_METADATA_FIELDS = [
   "quality",
   "isPremium",
@@ -19,6 +20,7 @@ export const PLAYBACK_METADATA_FIELDS = [
 
 export type PlaybackMetadataField = (typeof PLAYBACK_METADATA_FIELDS)[number];
 
+// Stored as strings in SQLite, validated in the domain layer before writes.
 export const VIDEO_QUALITIES = {
   SD: "SD",
   HD: "HD",
@@ -41,6 +43,7 @@ export function isVideoQuality(value: string): value is VideoQuality {
   return VIDEO_QUALITY_VALUES.includes(value as VideoQuality);
 }
 
+// Allows nullish values because empty metadata means "inherit from parent".
 export function assertVideoQuality(
   value: string | null | undefined,
 ): asserts value is VideoQuality | null | undefined {
