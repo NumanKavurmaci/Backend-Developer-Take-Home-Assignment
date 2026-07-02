@@ -1,4 +1,5 @@
 import type { ErrorHandler, NotFoundHandler } from "hono";
+import { HTTPException } from "hono/http-exception";
 
 type ApplicationError = Error & {
   errorCode?: string;
@@ -27,11 +28,28 @@ function toStatusCode(statusCode: number | undefined): JsonErrorStatusCode {
 
 // Keeps expected failures in one JSON shape across all modules.
 export const errorHandler: ErrorHandler = (error, c) => {
+  if (error instanceof HTTPException) {
+    const statusCode = toStatusCode(error.status);
+
+    return c.json(
+      {
+        errorCode:
+          statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "REQUEST_FAILED",
+        message:
+          statusCode === 500 ? "Unexpected server error." : error.message,
+      },
+      statusCode,
+    );
+  }
+
   const applicationError = error as ApplicationError;
+
   const statusCode = toStatusCode(applicationError.statusCode);
+
   const errorCode =
     applicationError.errorCode ??
     (statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "REQUEST_FAILED");
+
   const message =
     statusCode === 500 ? "Unexpected server error." : applicationError.message;
 
