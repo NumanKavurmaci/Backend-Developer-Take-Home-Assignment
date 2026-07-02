@@ -43,6 +43,77 @@ LiveChannel
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
 | `epg-program/`               | Defines scheduled-program input validation, creation types, repository writes, invalid date checks, and invalid time-range rejection. |
 
+## EPG Program Subdomain
+
+EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for later overlap validation and concurrency protection.
+
+### `epg-program-types.ts`
+
+| Export                  | Purpose |
+| ----------------------- | ------- |
+| `EpgProgramRecord`      | Database/read shape returned after an EPG program has been saved. This aliases Prisma's generated `EpgProgram` type. |
+| `CreateEpgProgramInput` | Create/write shape accepted before Prisma adds database-managed fields like `createdAt` and `updatedAt`. |
+
+### `epg-program.ts`
+
+| Export                             | Purpose |
+| ---------------------------------- | ------- |
+| `EpgProgramValidationError`        | Domain validation error for invalid EPG input. API services map this to `400 Bad Request`. |
+| `normalizeEpgProgramName`          | Trims operator-provided program names. |
+| `normalizeEpgProgramChannelId`     | Trims channel IDs before validation and writes. |
+| `assertValidEpgProgramTimeRange`   | Rejects invalid `Date` values and ranges where `startTime >= endTime`. |
+| `assertValidEpgProgramInput`       | Validates required channel ID, required program name, and valid time range. |
+| `prepareEpgProgramCreateInput`     | Runs validation and returns normalized create data for repository writes. |
+
+### `epg-program-repository.ts`
+
+| Export              | Purpose |
+| ------------------- | ------- |
+| `createEpgProgram`  | Validates and normalizes create input, then inserts an `EpgProgram` row through Prisma. |
+
+The repository intentionally calls `prepareEpgProgramCreateInput(...)` even when the CMS service has already validated input. This protects the persistence boundary if another future use case calls the repository directly.
+
+## CMS EPG Program Module
+
+The HTTP endpoint for creating EPG programs lives under `src/modules/cms-epg-program/`.
+
+```http
+POST /api/v1/cms/channels/{channelId}/epg
+```
+
+| File                                | Responsibility |
+| ----------------------------------- | -------------- |
+| `cms-epg-program.module.ts`         | Registers the CMS EPG routes on the Hono app. |
+| `cms-epg-program.route.ts`          | Maps `POST /:channelId/epg` to the controller. |
+| `cms-epg-program.controller.ts`     | Reads route params and JSON body, calls the service, and returns `201 Created`. |
+| `cms-epg-program.service.ts`        | Builds validated create input, checks channel existence, maps expected domain errors to HTTP errors, and calls the repository. |
+| `cms-epg-program.route.test.ts`     | Covers route-level success and error responses. |
+| `cms-epg-program.service.test.ts`   | Covers service-level required-field validation. |
+
+Request flow:
+
+```text
+HTTP request
+  -> route
+  -> controller
+  -> service
+  -> EPG domain validation
+  -> EPG repository
+  -> Prisma EpgProgram insert
+```
+
+Current step boundaries:
+
+| Behavior | Status |
+| -------- | ------ |
+| Create program for an existing channel | implemented |
+| Missing required fields return `400` | implemented |
+| Missing channel returns `404` | implemented |
+| Invalid date strings return `400` | implemented |
+| Invalid time ranges return `400` | implemented |
+| Overlap validation | later step |
+| Concurrency-safe creation | later step |
+
 ## `live-channel.ts`
 
 ### `normalizeLiveChannelName(name)`

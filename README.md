@@ -249,6 +249,7 @@ npm test
 
 Additional project notes live under `docs/`:
 
+- `docs/api/cms-epg-program-api.md`
 - `docs/api/content-metadata-api.md`
 - `docs/database-structure.md`
 - `docs/domain/content-domain-index.md`
