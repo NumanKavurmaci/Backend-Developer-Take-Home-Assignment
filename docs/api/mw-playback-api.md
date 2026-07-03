@@ -36,6 +36,8 @@ Header values are trimmed before validation. Empty header values are treated as 
 
 ## Success Response
 
+Playback succeeds when the resolved metadata allows the supplied user country and device type.
+
 Example request:
 
 ```bash
@@ -254,4 +256,4 @@ Implemented now:
 - Geo-blocked requests return `403 Forbidden` with `GEO_BLOCKED`
 - Premium 4K content is blocked on `Mobile`
 - Device-blocked requests return `403 Forbidden` with `DEVICE_NOT_SUPPORTED`
-- Successful response includes playback URL and resolved metadata
+- Successful response includes `contentId`, `playback.playbackUrl`, request context, and resolved metadata

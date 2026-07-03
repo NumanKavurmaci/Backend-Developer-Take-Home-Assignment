@@ -21,8 +21,6 @@ The project focuses on the core domain problems from the case study: content met
 | EPG concurrency safety      | Transactional per-channel schedule-lock flow                                   |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-Final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
-
 ## Tech Stack
 
 | Concern        | Choice                                            |
@@ -195,6 +193,8 @@ GET /api/v1/mw/playback/{contentId}
 ```
 
 The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, checks geofencing and device restrictions, and returns playback details for allowed content.
+
+Playback succeeds only after the user country and device type are allowed. The successful response includes `contentId`, `playback.playbackUrl`, the normalized request context, and resolved metadata relevant to playback authorization.
 
 Required headers:
 

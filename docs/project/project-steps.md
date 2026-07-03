@@ -525,7 +525,7 @@ GET /api/v1/mw/playback/{contentId}
 
 ### Implementation Status
 
-Implemented in `src/modules/mw-playback/`. The endpoint now reads the required playback headers, resolves content metadata through the inheritance engine, returns `404 Not Found` for missing content, and includes the resolved `playbackUrl` in the successful response. Geofencing and device entitlement failures remain separate later steps.
+Implemented in `src/modules/mw-playback/`. The endpoint now reads the required playback headers, resolves content metadata through the inheritance engine, returns `404 Not Found` for missing content, and includes the resolved `playbackUrl` in the successful response. Geofencing and device entitlement checks are implemented in later playback steps.
 
 ---
 
@@ -603,6 +603,10 @@ Return playback details when all entitlement and device checks pass.
 - Response includes `playbackUrl` or relevant asset details.
 - Response may include resolved metadata relevant to playback.
 - Response format is documented in README.
+
+### Implementation Status
+
+Implemented in `src/modules/mw-playback/`. Successful playback is returned only after metadata lookup, geofencing, and device checks pass. The response includes `contentId`, `playback.playbackUrl`, normalized request context, and resolved playback metadata, and the response format is documented in `README.md` and `docs/api/mw-playback-api.md`.
 
 ---
 
