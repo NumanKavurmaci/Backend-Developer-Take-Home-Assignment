@@ -47,6 +47,24 @@ function createTestService() {
       });
     }
 
+    if (contentId === "premium-hd-content") {
+      return createResolvedContentMetadata(contentId, {
+        isPremium: true,
+        quality: VIDEO_QUALITIES.HD,
+        playbackUrl: "https://cdn.saatcms.test/premium/hd.m3u8",
+        geoBlockCountries: [],
+      });
+    }
+
+    if (contentId === "standard-4k-content") {
+      return createResolvedContentMetadata(contentId, {
+        isPremium: false,
+        quality: VIDEO_QUALITIES.UHD_4K,
+        playbackUrl: "https://cdn.saatcms.test/standard/4k.m3u8",
+        geoBlockCountries: [],
+      });
+    }
+
     return createResolvedContentMetadata(contentId);
   });
 }
@@ -375,6 +393,58 @@ describe("Middleware playback request headers", () => {
     });
 
     expect(response.status).toBe(403);
+  });
+
+  it("allows premium non-4K playback on Mobile", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/premium-hd-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "Mobile",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      contentId: "premium-hd-content",
+      playback: {
+        playbackUrl: "https://cdn.saatcms.test/premium/hd.m3u8",
+      },
+      metadata: {
+        quality: VIDEO_QUALITIES.HD,
+        isPremium: true,
+      },
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("allows non-premium 4K playback on Mobile", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/standard-4k-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "Mobile",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      contentId: "standard-4k-content",
+      playback: {
+        playbackUrl: "https://cdn.saatcms.test/standard/4k.m3u8",
+      },
+      metadata: {
+        quality: VIDEO_QUALITIES.UHD_4K,
+        isPremium: false,
+      },
+    });
+
+    expect(response.status).toBe(200);
   });
 
   it("allows premium 4K playback on SmartTV", async () => {
