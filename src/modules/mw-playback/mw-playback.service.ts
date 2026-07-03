@@ -1,4 +1,5 @@
 import { HTTPException } from "hono/http-exception";
+import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
 import { prisma } from "../../db/client.js";
 import {
   ContentNotFoundError,
@@ -36,6 +37,11 @@ class GeoBlockedPlaybackError extends Error {
   readonly statusCode = 403;
 }
 
+class Premium4KPlaybackNotSupportedOnDeviceError extends Error {
+  readonly errorCode = "DEVICE_NOT_SUPPORTED";
+  readonly statusCode = 403;
+}
+
 export class MwPlaybackService {
   constructor(
     private readonly contentResolver: PlaybackContentResolver = (contentId) =>
@@ -49,6 +55,7 @@ export class MwPlaybackService {
     const normalizedContentId = this.normalizeContentId(contentId);
     const metadata = await this.resolvePlaybackMetadata(normalizedContentId);
     this.assertUserCountryAllowed(requestContext, metadata);
+    this.assertDeviceSupported(requestContext, metadata);
 
     return {
       contentId: normalizedContentId,
@@ -105,6 +112,18 @@ export class MwPlaybackService {
 
     if (blockedCountries.includes(userCountry)) {
       throw new GeoBlockedPlaybackError();
+    }
+  }
+
+  private assertDeviceSupported(
+    requestContext: PlaybackRequestHeaders,
+    metadata: ResolvedContentMetadata,
+  ): void {
+    const isPremium4K =
+      metadata.isPremium === true && metadata.quality === VIDEO_QUALITIES.UHD_4K;
+
+    if (isPremium4K && requestContext.deviceType === "Mobile") {
+      throw new Premium4KPlaybackNotSupportedOnDeviceError();
     }
   }
 }

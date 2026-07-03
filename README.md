@@ -21,7 +21,7 @@ The project focuses on the core domain problems from the case study: content met
 | EPG concurrency safety      | Transactional per-channel schedule-lock flow                                   |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-Device entitlement and final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
+Final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
 
 ## Tech Stack
 
@@ -194,7 +194,7 @@ HTTP/1.1 404 Not Found
 GET /api/v1/mw/playback/{contentId}
 ```
 
-The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, checks geofencing, and returns playback details for allowed content.
+The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, checks geofencing and device restrictions, and returns playback details for allowed content.
 
 Required headers:
 
@@ -240,8 +240,6 @@ Response:
 }
 ```
 
-Device entitlement blocking is added in a later playback step.
-
 ### Geo-blocked Playback
 
 ```bash
@@ -260,6 +258,34 @@ Response:
 ```
 
 Geo-blocked responses do not include `playbackUrl` or asset details.
+
+### Unsupported Device
+
+Premium 4K content is allowed on `SmartTV` and `Web`, but blocked on `Mobile`.
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/movie-crystal-frontier \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TR" \
+  -H "X-Device-Type: Mobile"
+```
+
+Response:
+
+```json
+{
+  "errorCode": "DEVICE_NOT_SUPPORTED"
+}
+```
+
+Device-blocked responses do not include `playbackUrl` or asset details.
+
+Authorization error mapping:
+
+| Rule failure                | Service error                         | HTTP status | Response body                                  |
+| --------------------------- | ------------------------------------- | ----------- | ---------------------------------------------- |
+| User country is geo-blocked | `GeoBlockedPlaybackError`             | `403`       | `{ "errorCode": "GEO_BLOCKED" }`               |
+| Premium 4K on Mobile        | `Premium4KPlaybackNotSupportedOnDeviceError` | `403` | `{ "errorCode": "DEVICE_NOT_SUPPORTED" }` |
 
 ### Missing Content
 

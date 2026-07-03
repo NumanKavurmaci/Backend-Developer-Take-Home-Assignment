@@ -1,12 +1,12 @@
 # Middleware Playback API
 
-The middleware playback endpoint validates the request context, resolves content metadata, checks geofencing, and returns playback details for allowed content.
+The middleware playback endpoint validates the request context, resolves content metadata, checks geofencing and device restrictions, and returns playback details for allowed content.
 
 ```http
 GET /api/v1/mw/playback/{contentId}
 ```
 
-At this stage, the endpoint performs content lookup, blocks geo-restricted requests, and returns the resolved playback URL. Later assignment steps extend the same endpoint with device entitlement blocking.
+At this stage, the endpoint performs content lookup, blocks geo-restricted requests, blocks unsupported devices for premium 4K content, and returns the resolved playback URL.
 
 ## Request
 
@@ -22,7 +22,7 @@ Required headers:
 | ---------------- | -------- | ---------- | ------------------------------------------------ |
 | `X-User-Id`      | yes      | `user-123` | User identifier supplied by the calling system.  |
 | `X-User-Country` | yes      | `TR`       | User country code checked against resolved geo-block metadata. |
-| `X-Device-Type`  | yes      | `Web`      | Playback device type used by later device rules. |
+| `X-Device-Type`  | yes      | `Web`      | Playback device type checked against resolved playback metadata. |
 
 Supported device types:
 
@@ -75,8 +75,6 @@ Example response:
   }
 }
 ```
-
-Device restriction failures are added in a later playback step.
 
 ## Error Responses
 
@@ -191,6 +189,33 @@ Status:
 
 Geo-blocked responses do not include `playbackUrl` or asset details.
 
+### Unsupported Device
+
+Premium 4K content is allowed on `SmartTV` and `Web`, but blocked on `Mobile`.
+
+Example response:
+
+```json
+{
+  "errorCode": "DEVICE_NOT_SUPPORTED"
+}
+```
+
+Status:
+
+```http
+403 Forbidden
+```
+
+Device-blocked responses do not include `playbackUrl` or asset details.
+
+## Authorization Error Mapping
+
+| Rule failure                | Service error                         | HTTP status | Response body                                  |
+| --------------------------- | ------------------------------------- | ----------- | ---------------------------------------------- |
+| User country is geo-blocked | `GeoBlockedPlaybackError`             | `403`       | `{ "errorCode": "GEO_BLOCKED" }`               |
+| Premium 4K on Mobile        | `Premium4KPlaybackNotSupportedOnDeviceError` | `403` | `{ "errorCode": "DEVICE_NOT_SUPPORTED" }` |
+
 ## Implementation Map
 
 | Layer      | File                                                   |
@@ -211,6 +236,7 @@ HTTP request
   -> service normalizes contentId
   -> metadata inheritance engine resolves content metadata
   -> service rejects geo-blocked countries
+  -> service rejects unsupported devices
   -> controller returns playback URL and resolved metadata
 ```
 
@@ -226,8 +252,6 @@ Implemented now:
 - Missing content returns `404 Not Found`
 - Geofencing checks `X-User-Country` against resolved `geoBlockCountries`
 - Geo-blocked requests return `403 Forbidden` with `GEO_BLOCKED`
+- Premium 4K content is blocked on `Mobile`
+- Device-blocked requests return `403 Forbidden` with `DEVICE_NOT_SUPPORTED`
 - Successful response includes playback URL and resolved metadata
-
-Planned in later steps:
-
-- Device restriction rule

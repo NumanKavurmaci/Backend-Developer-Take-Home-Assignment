@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { CONTENT_TYPES } from "../../content/content-types.js";
 import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
-import { ContentNotFoundError } from "../../content/metadata-inheritance.js";
+import {
+  ContentNotFoundError,
+  type ResolvedContentMetadata,
+} from "../../content/metadata-inheritance.js";
 import {
   errorHandler,
   notFoundHandler,
@@ -11,23 +14,40 @@ import { MwPlaybackController } from "./mw-playback.controller.js";
 import { createMwPlaybackRoutes } from "./mw-playback.route.js";
 import { MwPlaybackService } from "./mw-playback.service.js";
 
+function createResolvedContentMetadata(
+  contentId: string,
+  overrides: Partial<ResolvedContentMetadata> = {},
+): ResolvedContentMetadata {
+  return {
+    contentId,
+    type: CONTENT_TYPES.EPISODE,
+    title: "Dark Side Relay",
+    parentalRating: "16+",
+    genre: "Space Adventure",
+    quality: VIDEO_QUALITIES.HD,
+    isPremium: false,
+    playbackUrl: "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
+    geoBlockCountries: ["IR", "SY"],
+    ...overrides,
+  };
+}
+
 function createTestService() {
   return new MwPlaybackService(async (contentId) => {
     if (contentId === "missing-content") {
       throw new ContentNotFoundError(contentId);
     }
 
-    return {
-      contentId,
-      type: CONTENT_TYPES.EPISODE,
-      title: "Dark Side Relay",
-      parentalRating: "16+",
-      genre: "Space Adventure",
-      quality: VIDEO_QUALITIES.HD,
-      isPremium: false,
-      playbackUrl: "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
-      geoBlockCountries: ["IR", "SY"],
-    };
+    if (contentId === "premium-4k-content") {
+      return createResolvedContentMetadata(contentId, {
+        isPremium: true,
+        quality: VIDEO_QUALITIES.UHD_4K,
+        playbackUrl: "https://cdn.saatcms.test/premium/4k.m3u8",
+        geoBlockCountries: [],
+      });
+    }
+
+    return createResolvedContentMetadata(contentId);
   });
 }
 
@@ -337,6 +357,77 @@ describe("Middleware playback request headers", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("rejects premium 4K playback on Mobile", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/premium-4k-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "Mobile",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "DEVICE_NOT_SUPPORTED",
+    });
+
+    expect(response.status).toBe(403);
+  });
+
+  it("allows premium 4K playback on SmartTV", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/premium-4k-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "SmartTV",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      contentId: "premium-4k-content",
+      playback: {
+        playbackUrl: "https://cdn.saatcms.test/premium/4k.m3u8",
+      },
+      metadata: {
+        quality: VIDEO_QUALITIES.UHD_4K,
+        isPremium: true,
+      },
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it("allows premium 4K playback on Web", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/premium-4k-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "Web",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      contentId: "premium-4k-content",
+      playback: {
+        playbackUrl: "https://cdn.saatcms.test/premium/4k.m3u8",
+      },
+      metadata: {
+        quality: VIDEO_QUALITIES.UHD_4K,
+        isPremium: true,
+      },
+    });
+
+    expect(response.status).toBe(200);
+  });
 });
 
 describe("Middleware playback service", () => {
@@ -408,6 +499,19 @@ describe("Middleware playback service", () => {
       }),
     ).rejects.toMatchObject({
       errorCode: "GEO_BLOCKED",
+      statusCode: 403,
+    });
+  });
+
+  it("rejects unsupported devices before returning playback details", async () => {
+    await expect(
+      createTestService().getPlayback("premium-4k-content", {
+        userId: "user-123",
+        userCountry: "TR",
+        deviceType: "Mobile",
+      }),
+    ).rejects.toMatchObject({
+      errorCode: "DEVICE_NOT_SUPPORTED",
       statusCode: 403,
     });
   });
