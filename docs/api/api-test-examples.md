@@ -5,10 +5,13 @@ This document is a reviewer-friendly request guide for manually testing the proj
 Run the project first:
 
 ```bash
+cp .env.example .env
 npm run db:reset
 npm run db:seed
 npm run dev
 ```
+
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp .env.example .env`.
 
 Base URL:
 

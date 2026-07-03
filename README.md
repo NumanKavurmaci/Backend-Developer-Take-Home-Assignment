@@ -22,10 +22,13 @@ The project implements the core middleware and CMS scheduling concerns from the 
 
 ```bash
 npm install
+cp .env.example .env
 npm run db:reset
 npm run db:seed
 npm run dev
 ```
+
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp .env.example .env`.
 
 The API runs locally at:
 
@@ -104,3 +107,5 @@ prisma/                         Prisma schema, migrations, and seed data
 npm run typecheck
 npm test
 ```
+
+The tests use the configured local SQLite database. If you run manual API examples after `npm test`, run `npm run db:reset` and `npm run db:seed` again first.
