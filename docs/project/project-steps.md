@@ -22,7 +22,7 @@ The project is focused on building a prototype of the SaatCMS Middleware Core En
 
 ---
 
-## 3. Tech Stack Decision and Project Setup
+## 2. Tech Stack Decision and Project Setup
 
 ### Description
 
@@ -75,7 +75,7 @@ After the stack is selected, initialize the project structure and prepare the ba
 
 ---
 
-## 4. Local Data Storage Setup
+## 3. Local Data Storage Setup
 
 ### Description
 
@@ -93,7 +93,7 @@ The assignment allows embedded or lightweight storage such as H2, SQLite, or Pos
 
 ---
 
-## 5. Seed Data Preparation
+## 4. Seed Data Preparation
 
 ### Description
 
@@ -114,7 +114,7 @@ The seed data should allow the reviewer to test metadata inheritance, EPG schedu
 
 ---
 
-## 6. Content Hierarchy Model
+## 5. Content Hierarchy Model
 
 ### Description
 
@@ -137,7 +137,7 @@ Series -> Season -> Episode
 
 ---
 
-## 7. Inheritable Metadata Fields
+## 6. Inheritable Metadata Fields
 
 ### Description
 
@@ -166,7 +166,7 @@ Additional fields may be added if needed for playback rules, such as:
 
 ---
 
-## 8. Metadata Inheritance Engine
+## 7. Metadata Inheritance Engine
 
 ### Description
 
@@ -192,7 +192,7 @@ Episode value -> Season value -> Series value
 
 ---
 
-## 9. Content Metadata API
+## 8. Content Metadata API
 
 ### Description
 
@@ -215,7 +215,7 @@ GET /api/v1/mw/content/{contentId}
 
 ---
 
-## 10. Metadata Inheritance Test Cases
+## 9. Metadata Inheritance Test Cases
 
 ### Description
 
@@ -237,7 +237,7 @@ Tests cover:
 
 ---
 
-## 11. Live Channel Model
+## 10. Live Channel Model
 
 ### Description
 
@@ -255,7 +255,7 @@ EPG programs must belong to a specific channel, and overlap validation must be s
 
 ---
 
-## 12. EPG Program Model
+## 11. EPG Program Model
 
 ### Description
 
@@ -279,7 +279,7 @@ Each EPG program must contain:
 
 ---
 
-## 13. Create EPG Program API
+## 12. Create EPG Program API
 
 ### Description
 
@@ -313,7 +313,7 @@ POST /api/v1/cms/channels/{channelId}/epg
 
 ---
 
-## 14. EPG Date-Time Validation
+## 13. EPG Date-Time Validation
 
 ### Description
 
@@ -332,7 +332,7 @@ The assignment specifically mentions UTC handling, so the system must treat subm
 
 ---
 
-## 15. EPG Overlap Validation
+## 14. EPG Overlap Validation
 
 ### Description
 
@@ -359,7 +359,7 @@ Implemented in `src/live-channel/epg-program/` and enforced before EPG persisten
 
 ---
 
-## 16. Back-to-Back EPG Scheduling
+## 15. Back-to-Back EPG Scheduling
 
 ### Description
 
@@ -392,7 +392,7 @@ Program B: 10:30 - 12:00
 
 ### Implementation Status
 
-Implemented through the same strict overlap predicate used by Step 15:
+Implemented through the same strict overlap predicate used by Step 14:
 
 ```text
 newStart < existingEnd AND newEnd > existingStart
@@ -402,7 +402,7 @@ Because both comparisons are strict, schedules that only touch at a boundary are
 
 ---
 
-## 17. EPG Concurrency Safety
+## 16. EPG Concurrency Safety
 
 ### Description
 
@@ -421,7 +421,7 @@ The assignment requires that two concurrent operator requests cannot accidentall
 
 ---
 
-## 18. Channel-Scoped Concurrency
+## 17. Channel-Scoped Concurrency
 
 ### Description
 
@@ -438,7 +438,7 @@ Scheduling on one channel should not unnecessarily block scheduling on another c
 
 ---
 
-## 19. EPG Test Cases
+## 18. EPG Test Cases
 
 ### Description
 
@@ -461,7 +461,7 @@ Tests cover:
 
 ---
 
-## 20. EPG Concurrency Test
+## 19. EPG Concurrency Test
 
 ### Description
 
@@ -479,7 +479,7 @@ This proves that race conditions cannot bypass the overlap validator.
 
 ---
 
-## 21. Playback Request Headers
+## 20. Playback Request Headers
 
 ### Description
 
@@ -502,7 +502,7 @@ The endpoint must accept:
 
 ---
 
-## 22. Playback API
+## 21. Playback API
 
 ### Description
 
@@ -529,7 +529,7 @@ Implemented in `src/modules/mw-playback/`. The endpoint now reads the required p
 
 ---
 
-## 23. Geofencing Rule
+## 22. Geofencing Rule
 
 ### Description
 
@@ -558,7 +558,7 @@ Implemented in `src/modules/mw-playback/`. Playback resolves metadata through th
 
 ---
 
-## 24. Device Restriction Rule
+## 23. Device Restriction Rule
 
 ### Description
 
@@ -589,7 +589,7 @@ Implemented in `src/modules/mw-playback/`. Playback checks resolved `isPremium` 
 
 ---
 
-## 25. Playback Success Response
+## 24. Playback Success Response
 
 ### Description
 
@@ -610,7 +610,7 @@ Implemented in `src/modules/mw-playback/`. Successful playback is returned only 
 
 ---
 
-## 26. Playback Authorization Test Cases
+## 25. Playback Authorization Test Cases
 
 ### Description
 
@@ -631,7 +631,7 @@ Tests cover:
 
 ---
 
-## 27. Standard Error Handling
+## 26. Standard Error Handling
 
 ### Description
 
@@ -666,7 +666,7 @@ Example error format:
 
 ---
 
-## 28. API Demonstration Examples
+## 27. API Demonstration Examples
 
 ### Description
 
@@ -690,7 +690,7 @@ README includes examples for:
 
 ---
 
-## 29. README Documentation
+## 28. README Documentation
 
 ### Description
 
@@ -720,7 +720,7 @@ README includes:
 
 ---
 
-## 30. Final Review
+## 29. Final Review
 
 ### Description
 
@@ -744,7 +744,7 @@ Review the full project before submission to ensure the assignment requirements 
 
 ---
 
-## 31. GitHub Submission
+## 30. GitHub Submission
 
 ### Description
 
