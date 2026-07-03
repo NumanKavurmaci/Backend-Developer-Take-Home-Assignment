@@ -139,13 +139,13 @@ Uses the canonical content type constants from `content-types.ts`.
 
 ## Exports
 
-### `ContentHierarchyError`
+### `DomainError`
 
 ```ts
-export class ContentHierarchyError extends Error
+export class DomainError extends Error
 ```
 
-Custom domain error thrown when content hierarchy rules are violated.
+Shared domain error thrown when expected content-domain rules are violated.
 
 Examples:
 
@@ -187,7 +187,7 @@ Behavior:
 1. Looks up the expected parent type using `getAllowedParentType`.
 2. If expected parent is `null`, rejects any provided parent.
 3. If expected parent is required, rejects missing parent.
-4. If parent exists but has wrong type, throws `ContentHierarchyError`.
+4. If parent exists but has wrong type, throws `DomainError` with `INVALID_CONTENT_HIERARCHY`.
 5. Otherwise returns normally.
 
 Used in:
@@ -299,13 +299,13 @@ Array of allowed video quality values.
 
 Used by validation helpers.
 
-### `ContentMetadataError`
+### `DomainError`
 
 ```ts
-export class ContentMetadataError extends Error
+export class DomainError extends Error
 ```
 
-Custom domain error thrown when metadata validation fails.
+Shared domain error thrown when metadata validation fails.
 
 Currently used for invalid video quality values.
 
@@ -431,13 +431,13 @@ Series -> Season -> Episode
 
 The depth limit prevents infinite or excessive traversal if database hierarchy data is corrupted.
 
-### `ContentGeoBlockError`
+### `DomainError`
 
 ```ts
-export class ContentGeoBlockError extends Error
+export class DomainError extends Error
 ```
 
-Custom domain error thrown when geo-block country input is invalid.
+Shared domain error thrown when geo-block country input is invalid.
 
 Examples:
 
@@ -470,7 +470,7 @@ normalizeGeoBlockCountries(["tr", " TR ", "de"]);
 // ["TR", "DE"]
 ```
 
-Throws `ContentGeoBlockError` if any code is not ISO-3166 alpha-2 style.
+Throws `DomainError` with `INVALID_CONTENT_GEO_BLOCK_COUNTRIES` if any code is not ISO-3166 alpha-2 style.
 
 ### `createContent(prisma, input)`
 
@@ -717,18 +717,15 @@ Fields:
 
 ## Exported Classes
 
-### `ContentNotFoundError`
+### `DomainError`
 
 ```ts
-export class ContentNotFoundError extends Error {
-  readonly errorCode = "CONTENT_NOT_FOUND";
-  readonly statusCode = 404;
-}
+export class DomainError extends Error
 ```
 
 Thrown when `resolveContentMetadata(...)` cannot find the requested content.
 
-Useful for mapping domain errors to HTTP `404 Not Found` in the API layer.
+The API layer maps `CONTENT_NOT_FOUND` to HTTP `404 Not Found`.
 
 ## Exported Functions
 
@@ -746,7 +743,7 @@ Main function for resolving metadata.
 Flow:
 
 1. Loads ancestor path using `getContentAncestorPath(prisma, contentId)`.
-2. Throws `ContentNotFoundError` if no rows are found.
+2. Throws `DomainError` with `CONTENT_NOT_FOUND` if no rows are found.
 3. Validates ancestor path with `assertAncestorPathMatchesContentHierarchyRules(...)`.
 4. Reverses root-first ancestor path into closest-first priority path.
 5. Loads geo-block country rows for all content IDs in the path.
@@ -937,14 +934,13 @@ Current domain output shape from `ResolvedContentMetadata`:
 If content does not exist, `resolveContentMetadata(...)` throws:
 
 ```ts
-ContentNotFoundError;
+DomainError;
 ```
 
 With:
 
 ```ts
 errorCode = "CONTENT_NOT_FOUND";
-statusCode = 404;
 ```
 
 The HTTP error handler should map this to:
@@ -1048,7 +1044,7 @@ This prevents accidentally skipping `false`.
 | `CONTENT_TYPE_VALUES`                            | `content-types.ts`        | Yes      | Array of allowed content types.               |
 | `isContentType`                                  | `content-types.ts`        | Yes      | Runtime content type guard.                   |
 | `assertContentType`                              | `content-types.ts`        | Yes      | Throws on invalid content type.               |
-| `ContentHierarchyError`                          | `content-hierarchy.ts`    | Yes      | Error for invalid parent-child hierarchy.     |
+| `DomainError`                                    | `shared/domain/domain-error.ts` | Yes | Shared expected domain error type.            |
 | `getAllowedParentType`                           | `content-hierarchy.ts`    | Yes      | Returns expected parent type.                 |
 | `validateContentParent`                          | `content-hierarchy.ts`    | Yes      | Validates parent-child relationship.          |
 | `INHERITABLE_METADATA_FIELDS`                    | `content-metadata.ts`     | Yes      | Fields that can be inherited.                 |
@@ -1058,14 +1054,12 @@ This prevents accidentally skipping `false`.
 | `VIDEO_QUALITIES`                                | `content-metadata.ts`     | Yes      | Allowed quality constants.                    |
 | `VideoQuality`                                   | `content-metadata.ts`     | Yes      | Union type of quality values.                 |
 | `VIDEO_QUALITY_VALUES`                           | `content-metadata.ts`     | Yes      | Array of allowed quality values.              |
-| `ContentMetadataError`                           | `content-metadata.ts`     | Yes      | Error for invalid metadata.                   |
 | `isVideoQuality`                                 | `content-metadata.ts`     | Yes      | Runtime video quality guard.                  |
 | `assertVideoQuality`                             | `content-metadata.ts`     | Yes      | Throws on invalid non-null quality.           |
 | `CreateContentInput`                             | `content-repository.ts`   | Yes      | Input type for creating content.              |
 | `ContentWithChildren`                            | `content-repository.ts`   | Yes      | Content with direct children.                 |
 | `ContentWithParent`                              | `content-repository.ts`   | Yes      | Content with direct parent.                   |
 | `MAX_CONTENT_HIERARCHY_DEPTH`                    | `content-repository.ts`   | Yes      | Safety depth limit.                           |
-| `ContentGeoBlockError`                           | `content-repository.ts`   | Yes      | Error for invalid geo-block input.            |
 | `normalizeGeoBlockCountries`                     | `content-repository.ts`   | Yes      | Normalizes and validates country codes.       |
 | `createContent`                                  | `content-repository.ts`   | Yes      | Validates and creates content row.            |
 | `getContentWithChildren`                         | `content-repository.ts`   | Yes      | Loads content with direct children.           |
@@ -1074,7 +1068,6 @@ This prevents accidentally skipping `false`.
 | `listContentChildren`                            | `content-repository.ts`   | Yes      | Lists direct children by parent ID.           |
 | `contentSelectForHierarchy`                      | `content-repository.ts`   | Yes      | Reusable Prisma select for hierarchy fields.  |
 | `ResolvedContentMetadata`                        | `metadata-inheritance.ts` | Yes      | Final resolved metadata type.                 |
-| `ContentNotFoundError`                           | `metadata-inheritance.ts` | Yes      | 404 domain error for missing content.         |
 | `resolveContentMetadata`                         | `metadata-inheritance.ts` | Yes      | Main metadata inheritance resolver.           |
 | `resolveFirstDefinedMetadataValue`               | `metadata-inheritance.ts` | No       | Resolves scalar fields from closest ancestor. |
 | `assertAncestorPathMatchesContentHierarchyRules` | `metadata-inheritance.ts` | No       | Validates loaded path before inheritance.     |

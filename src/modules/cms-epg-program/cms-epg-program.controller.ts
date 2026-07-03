@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { ApiError } from "../../shared/http/api-error.js";
 import { CmsEpgProgramService } from "./cms-epg-program.service.js";
 
 // Handles HTTP details: route params, JSON parsing, status codes, and responses.
@@ -22,8 +22,10 @@ async function readJsonBody(c: Context): Promise<unknown> {
   try {
     return await c.req.json();
   } catch {
-    throw new HTTPException(400, {
-      message: "Request body must be valid JSON",
-    });
+    throw new ApiError(
+      400,
+      "INVALID_REQUEST_BODY",
+      "Request body must be valid JSON",
+    );
   }
 }

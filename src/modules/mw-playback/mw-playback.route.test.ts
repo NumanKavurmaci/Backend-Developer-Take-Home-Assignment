@@ -2,10 +2,8 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { CONTENT_TYPES } from "../../content/content-types.js";
 import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
-import {
-  ContentNotFoundError,
-  type ResolvedContentMetadata,
-} from "../../content/metadata-inheritance.js";
+import { type ResolvedContentMetadata } from "../../content/metadata-inheritance.js";
+import { DomainError } from "../../shared/domain/domain-error.js";
 import {
   errorHandler,
   notFoundHandler,
@@ -35,7 +33,7 @@ function createResolvedContentMetadata(
 function createTestService() {
   return new MwPlaybackService(async (contentId) => {
     if (contentId === "missing-content") {
-      throw new ContentNotFoundError(contentId);
+      throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
     }
 
     if (contentId === "premium-4k-content") {
@@ -212,7 +210,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-User-Id header is required",
     });
 
@@ -232,7 +230,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-User-Id header is required",
     });
 
@@ -251,7 +249,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-User-Country header is required",
     });
 
@@ -271,7 +269,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-User-Country header is required",
     });
 
@@ -290,7 +288,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-Device-Type header is required",
     });
 
@@ -310,7 +308,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "MISSING_HEADER",
       message: "X-Device-Type header is required",
     });
 
@@ -330,7 +328,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "INVALID_DEVICE_TYPE",
       message: "X-Device-Type must be one of: Mobile, SmartTV, Web",
     });
 
@@ -350,7 +348,7 @@ describe("Middleware playback request headers", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "CONTENT_NOT_FOUND",
       message: "Content not found",
     });
 
@@ -371,6 +369,7 @@ describe("Middleware playback request headers", () => {
 
     await expect(response.json()).resolves.toEqual({
       errorCode: "GEO_BLOCKED",
+      message: "Playback is not available in the user's country.",
     });
 
     expect(response.status).toBe(403);
@@ -390,6 +389,7 @@ describe("Middleware playback request headers", () => {
 
     await expect(response.json()).resolves.toEqual({
       errorCode: "DEVICE_NOT_SUPPORTED",
+      message: "Playback is not available on this device type.",
     });
 
     expect(response.status).toBe(403);
@@ -509,7 +509,8 @@ describe("Middleware playback service", () => {
         deviceType: "Web",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_REQUEST",
       message: "contentId is required",
     });
   });
@@ -522,7 +523,8 @@ describe("Middleware playback service", () => {
         deviceType: "Web",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_REQUEST",
       message: "contentId is required",
     });
   });
@@ -569,7 +571,7 @@ describe("Middleware playback service", () => {
       }),
     ).rejects.toMatchObject({
       errorCode: "GEO_BLOCKED",
-      statusCode: 403,
+      message: "Playback is not available in the user's country.",
     });
   });
 
@@ -582,7 +584,7 @@ describe("Middleware playback service", () => {
       }),
     ).rejects.toMatchObject({
       errorCode: "DEVICE_NOT_SUPPORTED",
-      statusCode: 403,
+      message: "Playback is not available on this device type.",
     });
   });
 });

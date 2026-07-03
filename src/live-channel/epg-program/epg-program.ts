@@ -1,11 +1,5 @@
 import type { CreateEpgProgramInput } from "./epg-program-types.js";
-
-export class EpgProgramValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "EpgProgramValidationError";
-  }
-}
+import { DomainError } from "../../shared/domain/domain-error.js";
 
 export function normalizeEpgProgramName(programName: string): string {
   return programName.trim();
@@ -20,15 +14,22 @@ export function assertValidEpgProgramTimeRange(
   endTime: Date,
 ): void {
   if (Number.isNaN(startTime.getTime())) {
-    throw new EpgProgramValidationError("EPG program startTime is invalid.");
+    throw new DomainError(
+      "INVALID_DATE_TIME_FORMAT",
+      "EPG program startTime is invalid.",
+    );
   }
 
   if (Number.isNaN(endTime.getTime())) {
-    throw new EpgProgramValidationError("EPG program endTime is invalid.");
+    throw new DomainError(
+      "INVALID_DATE_TIME_FORMAT",
+      "EPG program endTime is invalid.",
+    );
   }
 
   if (startTime >= endTime) {
-    throw new EpgProgramValidationError(
+    throw new DomainError(
+      "INVALID_TIME_RANGE",
       "EPG program startTime must be before endTime.",
     );
   }
@@ -36,11 +37,17 @@ export function assertValidEpgProgramTimeRange(
 
 export function assertValidEpgProgramInput(input: CreateEpgProgramInput): void {
   if (!normalizeEpgProgramChannelId(input.channelId)) {
-    throw new EpgProgramValidationError("EPG program channelId is required.");
+    throw new DomainError(
+      "INVALID_REQUEST_BODY",
+      "EPG program channelId is required.",
+    );
   }
 
   if (!normalizeEpgProgramName(input.programName)) {
-    throw new EpgProgramValidationError("EPG program name is required.");
+    throw new DomainError(
+      "INVALID_REQUEST_BODY",
+      "EPG program name is required.",
+    );
   }
 
   assertValidEpgProgramTimeRange(input.startTime, input.endTime);

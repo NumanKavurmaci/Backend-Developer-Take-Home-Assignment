@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { HTTPException } from "hono/http-exception";
+import { ApiError } from "../../shared/http/api-error.js";
 
 export const SUPPORTED_DEVICE_TYPES = ["Mobile", "SmartTV", "Web"] as const;
 
@@ -23,9 +23,11 @@ function readRequiredHeader(c: Context, headerName: string): string {
   const value = c.req.header(headerName)?.trim();
 
   if (!value) {
-    throw new HTTPException(400, {
-      message: `${headerName} header is required`,
-    });
+    throw new ApiError(
+      400,
+      "MISSING_HEADER",
+      `${headerName} header is required`,
+    );
   }
 
   return value;
@@ -35,9 +37,11 @@ function readDeviceTypeHeader(c: Context): DeviceType {
   const value = readRequiredHeader(c, "X-Device-Type");
 
   if (!isSupportedDeviceType(value)) {
-    throw new HTTPException(400, {
-      message: `X-Device-Type must be one of: ${SUPPORTED_DEVICE_TYPES.join(", ")}`,
-    });
+    throw new ApiError(
+      400,
+      "INVALID_DEVICE_TYPE",
+      `X-Device-Type must be one of: ${SUPPORTED_DEVICE_TYPES.join(", ")}`,
+    );
   }
 
   return value;

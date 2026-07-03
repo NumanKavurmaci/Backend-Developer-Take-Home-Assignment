@@ -58,7 +58,7 @@ EPG programs are stored under `src/live-channel/epg-program/` because they are s
 
 | Export                             | Purpose |
 | ---------------------------------- | ------- |
-| `EpgProgramValidationError`        | Domain validation error for invalid EPG input. API services map this to `400 Bad Request`. |
+| `DomainError`                      | Domain validation error for invalid EPG input. API services map EPG codes to `400 Bad Request`. |
 | `normalizeEpgProgramName`          | Trims operator-provided program names. |
 | `normalizeEpgProgramChannelId`     | Trims channel IDs before validation and writes. |
 | `assertValidEpgProgramTimeRange`   | Rejects invalid `Date` values and ranges where `startTime >= endTime`. |

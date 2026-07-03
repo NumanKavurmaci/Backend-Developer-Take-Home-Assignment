@@ -1,3 +1,5 @@
+import { DomainError } from "../shared/domain/domain-error.js";
+
 export const INHERITABLE_METADATA_FIELDS = [
   "parentalRating",
   "genre",
@@ -32,13 +34,6 @@ export type VideoQuality =
 
 export const VIDEO_QUALITY_VALUES = Object.values(VIDEO_QUALITIES);
 
-export class ContentMetadataError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ContentMetadataError";
-  }
-}
-
 export function isVideoQuality(value: string): value is VideoQuality {
   return VIDEO_QUALITY_VALUES.includes(value as VideoQuality);
 }
@@ -48,7 +43,8 @@ export function assertVideoQuality(
   value: string | null | undefined,
 ): asserts value is VideoQuality | null | undefined {
   if (value !== null && value !== undefined && !isVideoQuality(value)) {
-    throw new ContentMetadataError(
+    throw new DomainError(
+      "INVALID_CONTENT_METADATA",
       `Invalid video quality "${value}". Allowed values: ${VIDEO_QUALITY_VALUES.join(", ")}.`,
     );
   }

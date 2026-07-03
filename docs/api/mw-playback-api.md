@@ -84,7 +84,7 @@ All expected header validation failures use the shared JSON error shape:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "ERROR_CODE",
   "message": "Readable error message"
 }
 ```
@@ -109,7 +109,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "MISSING_HEADER",
   "message": "X-User-Id header is required"
 }
 ```
@@ -120,7 +120,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "MISSING_HEADER",
   "message": "X-User-Country header is required"
 }
 ```
@@ -131,7 +131,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "MISSING_HEADER",
   "message": "X-Device-Type header is required"
 }
 ```
@@ -157,7 +157,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "INVALID_DEVICE_TYPE",
   "message": "X-Device-Type must be one of: Mobile, SmartTV, Web"
 }
 ```
@@ -168,7 +168,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "CONTENT_NOT_FOUND",
   "message": "Content not found"
 }
 ```
@@ -179,7 +179,8 @@ Example response:
 
 ```json
 {
-  "errorCode": "GEO_BLOCKED"
+  "errorCode": "GEO_BLOCKED",
+  "message": "Playback is not available in the user's country."
 }
 ```
 
@@ -199,7 +200,8 @@ Example response:
 
 ```json
 {
-  "errorCode": "DEVICE_NOT_SUPPORTED"
+  "errorCode": "DEVICE_NOT_SUPPORTED",
+  "message": "Playback is not available on this device type."
 }
 ```
 
@@ -213,10 +215,10 @@ Device-blocked responses do not include `playbackUrl` or asset details.
 
 ## Authorization Error Mapping
 
-| Rule failure                | Service error                         | HTTP status | Response body                                  |
-| --------------------------- | ------------------------------------- | ----------- | ---------------------------------------------- |
-| User country is geo-blocked | `GeoBlockedPlaybackError`             | `403`       | `{ "errorCode": "GEO_BLOCKED" }`               |
-| Premium 4K on Mobile        | `Premium4KPlaybackNotSupportedOnDeviceError` | `403` | `{ "errorCode": "DEVICE_NOT_SUPPORTED" }` |
+| Rule failure                | Domain error code      | HTTP status |
+| --------------------------- | ---------------------- | ----------- |
+| User country is geo-blocked | `GEO_BLOCKED`          | `403`       |
+| Premium 4K on Mobile        | `DEVICE_NOT_SUPPORTED` | `403`       |
 
 ## Implementation Map
 

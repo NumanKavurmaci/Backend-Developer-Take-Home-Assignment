@@ -9,7 +9,8 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T19:00:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_REQUEST_BODY",
       message: "programName is required",
     });
   });
@@ -21,7 +22,8 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T19:00:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_REQUEST_BODY",
       message: "startTime is required",
     });
   });
@@ -33,7 +35,8 @@ describe("CMS EPG program service", () => {
         startTime: "2026-07-02T18:00:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_REQUEST_BODY",
       message: "endTime is required",
     });
   });
@@ -46,7 +49,8 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T19:00:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_DATE_TIME_FORMAT",
       message: "startTime must be an ISO 8601 date-time string with timezone",
     });
   });
@@ -59,7 +63,8 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T19:00:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      statusCode: 400,
+      errorCode: "INVALID_DATE_TIME_FORMAT",
       message: "startTime must be an ISO 8601 date-time string with timezone",
     });
   });
@@ -72,7 +77,8 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T18:30:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 404,
+      statusCode: 404,
+      errorCode: "CHANNEL_NOT_FOUND",
       message: "Channel not found",
     });
   });
@@ -85,7 +91,7 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T17:30:00Z",
       }),
     ).rejects.toMatchObject({
-      status: 400,
+      errorCode: "INVALID_TIME_RANGE",
       message: "EPG program startTime must be before endTime.",
     });
   });

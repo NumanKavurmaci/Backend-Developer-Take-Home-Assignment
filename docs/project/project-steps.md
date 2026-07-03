@@ -585,7 +585,7 @@ Certain premium assets, such as 4K content, must be blocked on Mobile and allowe
 
 ### Implementation Status
 
-Implemented in `src/modules/mw-playback/`. Playback checks resolved `isPremium` and `quality` metadata, allows premium `UHD_4K` content on `SmartTV` and `Web`, rejects it on `Mobile` through `Premium4KPlaybackNotSupportedOnDeviceError`, maps that error to `403 Forbidden` with `DEVICE_NOT_SUPPORTED`, and stops before returning playback details.
+Implemented in `src/modules/mw-playback/`. Playback checks resolved `isPremium` and `quality` metadata, allows premium `UHD_4K` content on `SmartTV` and `Web`, rejects it on `Mobile` through `DomainError` code `DEVICE_NOT_SUPPORTED`, maps that error to `403 Forbidden`, and stops before returning playback details.
 
 ---
 

@@ -3,6 +3,7 @@ import { assertContentType, type ContentType } from "./content-types.js";
 import { validateContentParent } from "./content-hierarchy.js";
 import { assertVideoQuality, type VideoQuality } from "./content-metadata.js";
 import { getContentAncestorPath } from "./content-repository.js";
+import { DomainError } from "../shared/domain/domain-error.js";
 
 type ResolvedContentBase = Pick<
   Content,
@@ -16,16 +17,6 @@ export type ResolvedContentMetadata = ResolvedContentBase & {
   geoBlockCountries: string[];
 };
 
-export class ContentNotFoundError extends Error {
-  readonly errorCode = "CONTENT_NOT_FOUND";
-  readonly statusCode = 404;
-
-  constructor(contentId: string) {
-    super(`Content ${contentId} was not found.`);
-    this.name = "ContentNotFoundError";
-  }
-}
-
 // Resolves final metadata from closest content first: Episode -> Season -> Series.
 export async function resolveContentMetadata(
   prisma: PrismaClient,
@@ -34,7 +25,7 @@ export async function resolveContentMetadata(
   const ancestorPath = await getContentAncestorPath(prisma, contentId);
 
   if (ancestorPath.length === 0) {
-    throw new ContentNotFoundError(contentId);
+    throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
   }
 
   assertAncestorPathMatchesContentHierarchyRules(ancestorPath);
@@ -47,7 +38,7 @@ export async function resolveContentMetadata(
   const requestedContent = metadataPriorityPath[0];
 
   if (!requestedContent) {
-    throw new ContentNotFoundError(contentId);
+    throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
   }
 
   const resolvedQuality = resolveFirstDefinedMetadataValue(

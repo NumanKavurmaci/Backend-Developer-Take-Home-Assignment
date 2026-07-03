@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../shared/http/api-error.js";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
 import { CmsEpgProgramController } from "./cms-epg-program.controller.js";
 import { createCmsEpgProgramRoutes } from "./cms-epg-program.route.js";
@@ -82,7 +82,7 @@ describe("CMS EPG program API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "INVALID_REQUEST_BODY",
       message: "Request body must be valid JSON",
     });
     expect(response.status).toBe(400);
@@ -91,9 +91,7 @@ describe("CMS EPG program API routes", () => {
 
   it("returns a client error when a required field is missing", async () => {
     const createProgram = vi.fn().mockRejectedValue(
-      new HTTPException(400, {
-        message: "programName is required",
-      }),
+      new ApiError(400, "INVALID_REQUEST_BODY", "programName is required"),
     );
 
     const response = await createTestApp({ createProgram }).request(
@@ -111,7 +109,7 @@ describe("CMS EPG program API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "INVALID_REQUEST_BODY",
       message: "programName is required",
     });
     expect(response.status).toBe(400);
@@ -119,9 +117,11 @@ describe("CMS EPG program API routes", () => {
 
   it("returns a client error when the time range is invalid", async () => {
     const createProgram = vi.fn().mockRejectedValue(
-      new HTTPException(400, {
-        message: "EPG program startTime must be before endTime.",
-      }),
+      new ApiError(
+        400,
+        "INVALID_TIME_RANGE",
+        "EPG program startTime must be before endTime.",
+      ),
     );
 
     const response = await createTestApp({ createProgram }).request(
@@ -140,7 +140,7 @@ describe("CMS EPG program API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "INVALID_TIME_RANGE",
       message: "EPG program startTime must be before endTime.",
     });
     expect(response.status).toBe(400);
@@ -148,9 +148,11 @@ describe("CMS EPG program API routes", () => {
 
   it("returns a client error when the program overlaps an existing schedule", async () => {
     const createProgram = vi.fn().mockRejectedValue(
-      new HTTPException(400, {
-        message: "EPG program overlaps with an existing schedule on this channel.",
-      }),
+      new ApiError(
+        400,
+        "EPG_OVERLAP",
+        "EPG program overlaps with an existing schedule on this channel.",
+      ),
     );
 
     const response = await createTestApp({ createProgram }).request(
@@ -169,7 +171,7 @@ describe("CMS EPG program API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "EPG_OVERLAP",
       message: "EPG program overlaps with an existing schedule on this channel.",
     });
     expect(response.status).toBe(400);
@@ -177,9 +179,7 @@ describe("CMS EPG program API routes", () => {
 
   it("returns a consistent 404 response when the channel is missing", async () => {
     const createProgram = vi.fn().mockRejectedValue(
-      new HTTPException(404, {
-        message: "Channel not found",
-      }),
+      new ApiError(404, "CHANNEL_NOT_FOUND", "Channel not found"),
     );
 
     const response = await createTestApp({ createProgram }).request(
@@ -198,7 +198,7 @@ describe("CMS EPG program API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "CHANNEL_NOT_FOUND",
       message: "Channel not found",
     });
     expect(response.status).toBe(404);

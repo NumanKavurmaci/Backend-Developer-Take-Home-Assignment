@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { DomainError } from "../../shared/domain/domain-error.js";
 import {
-  EpgProgramValidationError,
   assertValidEpgProgramInput,
   assertValidEpgProgramTimeRange,
   normalizeEpgProgramChannelId,
@@ -31,7 +31,12 @@ describe("EPG program domain", () => {
     const startTime = new Date("2026-07-02T08:00:00.000Z");
 
     expect(() => assertValidEpgProgramTimeRange(startTime, startTime)).toThrow(
-      EpgProgramValidationError,
+      DomainError,
+    );
+    expect(() => assertValidEpgProgramTimeRange(startTime, startTime)).toThrow(
+      expect.objectContaining({
+        errorCode: "INVALID_TIME_RANGE",
+      }),
     );
     expect(() => assertValidEpgProgramTimeRange(startTime, startTime)).toThrow(
       "EPG program startTime must be before endTime.",

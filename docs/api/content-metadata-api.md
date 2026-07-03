@@ -87,7 +87,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "CONTENT_NOT_FOUND",
   "message": "Content not found"
 }
 ```

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { HTTPException } from "hono/http-exception";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
+import { ApiError } from "../../shared/http/api-error.js";
 import { CONTENT_TYPES } from "../../content/content-types.js";
 import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
 import { MwContentController } from "./mw-content.controller.js";
@@ -58,9 +58,7 @@ describe("content metadata API routes", () => {
 
   it("returns a consistent 404 response when content is missing", async () => {
     const getResolvedContent = vi.fn().mockRejectedValue(
-      new HTTPException(404, {
-        message: "Content not found",
-      }),
+      new ApiError(404, "CONTENT_NOT_FOUND", "Content not found"),
     );
 
     const response = await createTestApp({ getResolvedContent }).request(
@@ -68,7 +66,7 @@ describe("content metadata API routes", () => {
     );
 
     await expect(response.json()).resolves.toEqual({
-      errorCode: "REQUEST_FAILED",
+      errorCode: "CONTENT_NOT_FOUND",
       message: "Content not found",
     });
     expect(response.status).toBe(404);

@@ -5,6 +5,7 @@ import {
   type VideoQuality,
 } from "./content-metadata.js";
 import { validateContentParent } from "./content-hierarchy.js";
+import { DomainError } from "../shared/domain/domain-error.js";
 
 export type CreateContentInput = {
   id: string;
@@ -31,13 +32,6 @@ export type ContentWithParent = Content & {
 // Safety limit for corrupted or unexpectedly deep hierarchy data, not a business depth rule.
 export const MAX_CONTENT_HIERARCHY_DEPTH = 10;
 
-export class ContentGeoBlockError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ContentGeoBlockError";
-  }
-}
-
 const ISO_3166_ALPHA_2_COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
 
 export function normalizeGeoBlockCountries(
@@ -52,7 +46,8 @@ export function normalizeGeoBlockCountries(
   );
 
   if (invalidCountryCode !== undefined) {
-    throw new ContentGeoBlockError(
+    throw new DomainError(
+      "INVALID_CONTENT_GEO_BLOCK_COUNTRIES",
       "Country codes must be ISO-3166 alpha-2 codes like TR, DE, or US.",
     );
   }
@@ -81,7 +76,8 @@ export async function createContent(
   const geoBlockCountries = normalizeGeoBlockCountries(input.geoBlockCountries);
 
   if (!geoBlockCountriesOverride && geoBlockCountries.length > 0) {
-    throw new ContentGeoBlockError(
+    throw new DomainError(
+      "INVALID_CONTENT_GEO_BLOCK_COUNTRIES",
       "geoBlockCountries can only be provided when geoBlockCountriesOverride is true.",
     );
   }

@@ -1,8 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import {
-  EpgProgramValidationError,
-  prepareEpgProgramCreateInput,
-} from "./epg-program.js";
+import { DomainError } from "../../shared/domain/domain-error.js";
+import { prepareEpgProgramCreateInput } from "./epg-program.js";
 import type {
   CreateEpgProgramInput,
   EpgProgramRecord,
@@ -84,7 +82,8 @@ export async function assertNoOverlappingEpgProgram(
   });
 
   if (overlappingProgram) {
-    throw new EpgProgramValidationError(
+    throw new DomainError(
+      "EPG_OVERLAP",
       "EPG program overlaps with an existing schedule on this channel.",
     );
   }

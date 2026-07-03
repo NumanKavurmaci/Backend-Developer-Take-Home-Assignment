@@ -125,7 +125,7 @@ All expected errors use the shared JSON error shape:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "ERROR_CODE",
   "message": "Readable error message"
 }
 ```
@@ -150,7 +150,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "INVALID_REQUEST_BODY",
   "message": "programName is required"
 }
 ```
@@ -161,7 +161,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "INVALID_DATE_TIME_FORMAT",
   "message": "startTime must be an ISO 8601 date-time string with timezone"
 }
 ```
@@ -174,7 +174,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "INVALID_TIME_RANGE",
   "message": "EPG program startTime must be before endTime."
 }
 ```
@@ -185,7 +185,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "EPG_OVERLAP",
   "message": "EPG program overlaps with an existing schedule on this channel."
 }
 ```
@@ -210,7 +210,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "CHANNEL_NOT_FOUND",
   "message": "Channel not found"
 }
 ```
@@ -221,7 +221,7 @@ Example response:
 
 ```json
 {
-  "errorCode": "REQUEST_FAILED",
+  "errorCode": "INVALID_REQUEST_BODY",
   "message": "Request body must be valid JSON"
 }
 ```

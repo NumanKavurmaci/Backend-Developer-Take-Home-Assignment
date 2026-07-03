@@ -6,12 +6,9 @@ import {
   CONTENT_TYPES,
   isContentType,
 } from "./content-types.js";
+import { DomainError } from "../shared/domain/domain-error.js";
+import { getAllowedParentType } from "./content-hierarchy.js";
 import {
-  ContentHierarchyError,
-  getAllowedParentType,
-} from "./content-hierarchy.js";
-import {
-  ContentMetadataError,
   INHERITABLE_METADATA_FIELDS,
   PLAYBACK_METADATA_FIELDS,
   VIDEO_QUALITIES,
@@ -20,7 +17,6 @@ import {
   isVideoQuality,
 } from "./content-metadata.js";
 import {
-  ContentGeoBlockError,
   createContent,
   getContentAncestorPath,
   getContentWithChildren,
@@ -29,10 +25,7 @@ import {
   MAX_CONTENT_HIERARCHY_DEPTH,
   normalizeGeoBlockCountries,
 } from "./content-repository.js";
-import {
-  ContentNotFoundError,
-  resolveContentMetadata,
-} from "./metadata-inheritance.js";
+import { resolveContentMetadata } from "./metadata-inheritance.js";
 
 const prisma = new PrismaClient();
 
@@ -163,7 +156,7 @@ describe("content hierarchy rules", () => {
         type: CONTENT_TYPES.SEASON,
         title: "Invalid Season",
       }),
-    ).rejects.toThrow(ContentHierarchyError);
+    ).rejects.toThrow(DomainError);
   });
 
   it("rejects an Episode without a Season parent", async () => {
@@ -275,7 +268,7 @@ describe("inheritable metadata fields", () => {
   });
 
   it("rejects invalid video qualities before writing content", async () => {
-    expect(() => assertVideoQuality("8K")).toThrow(ContentMetadataError);
+    expect(() => assertVideoQuality("8K")).toThrow(DomainError);
 
     await expect(
       createContent(prisma, {
@@ -788,13 +781,12 @@ describe("metadata inheritance engine", () => {
     await expect(
       resolveContentMetadata(prisma, "missing-content"),
     ).rejects.toMatchObject({
-      name: "ContentNotFoundError",
+      name: "DomainError",
       errorCode: "CONTENT_NOT_FOUND",
-      statusCode: 404,
     });
     await expect(
       resolveContentMetadata(prisma, "missing-content"),
-    ).rejects.toThrow(ContentNotFoundError);
+    ).rejects.toThrow(DomainError);
   });
 
   it("rejects corrupted hierarchy data instead of resolving incorrect metadata", async () => {
@@ -1025,7 +1017,6 @@ describe("metadata inheritance test cases", () => {
       resolveContentMetadata(prisma, "missing-step-nine-content"),
     ).rejects.toMatchObject({
       errorCode: "CONTENT_NOT_FOUND",
-      statusCode: 404,
     });
   });
 
@@ -1064,14 +1055,12 @@ describe("geo-block input rules", () => {
 
   it("rejects invalid country code formats", () => {
     expect(() => normalizeGeoBlockCountries(["TUR"])).toThrow(
-      ContentGeoBlockError,
+      DomainError,
     );
     expect(() => normalizeGeoBlockCountries(["T1"])).toThrow(
-      ContentGeoBlockError,
+      DomainError,
     );
-    expect(() => normalizeGeoBlockCountries([""])).toThrow(
-      ContentGeoBlockError,
-    );
+    expect(() => normalizeGeoBlockCountries([""])).toThrow(DomainError);
   });
 
   it("rejects geo-block countries when geo-block override is false", async () => {

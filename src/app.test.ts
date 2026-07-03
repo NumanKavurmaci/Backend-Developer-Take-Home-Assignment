@@ -21,4 +21,19 @@ describe("Hono app scaffold", () => {
     });
     expect(response.status).toBe(404);
   });
+
+  it("returns a generic JSON response for unexpected server errors", async () => {
+    const app = createApp();
+    app.get("/boom", () => {
+      throw new Error("database password leaked through an error");
+    });
+
+    const response = await app.request("/boom");
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "INTERNAL_SERVER_ERROR",
+      message: "Unexpected server error.",
+    });
+    expect(response.status).toBe(500);
+  });
 });

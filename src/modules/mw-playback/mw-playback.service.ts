@@ -1,11 +1,11 @@
-import { HTTPException } from "hono/http-exception";
 import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
 import { prisma } from "../../db/client.js";
 import {
-  ContentNotFoundError,
   resolveContentMetadata,
   type ResolvedContentMetadata,
 } from "../../content/metadata-inheritance.js";
+import { DomainError } from "../../shared/domain/domain-error.js";
+import { ApiError } from "../../shared/http/api-error.js";
 import type { PlaybackRequestHeaders } from "./playback-request-headers.js";
 
 type PlaybackContentResolver = (
@@ -31,16 +31,6 @@ export type PlaybackResponse = {
   };
   metadata: PlaybackResponseMetadata;
 };
-
-class GeoBlockedPlaybackError extends Error {
-  readonly errorCode = "GEO_BLOCKED";
-  readonly statusCode = 403;
-}
-
-class Premium4KPlaybackNotSupportedOnDeviceError extends Error {
-  readonly errorCode = "DEVICE_NOT_SUPPORTED";
-  readonly statusCode = 403;
-}
 
 export class MwPlaybackService {
   constructor(
@@ -76,26 +66,14 @@ export class MwPlaybackService {
   }
 
   private async resolvePlaybackMetadata(contentId: string) {
-    try {
-      return await this.contentResolver(contentId);
-    } catch (error) {
-      if (error instanceof ContentNotFoundError) {
-        throw new HTTPException(404, {
-          message: "Content not found",
-        });
-      }
-
-      throw error;
-    }
+    return this.contentResolver(contentId);
   }
 
   private normalizeContentId(contentId: string | undefined): string {
     const normalizedContentId = contentId?.trim();
 
     if (!normalizedContentId) {
-      throw new HTTPException(400, {
-        message: "contentId is required",
-      });
+      throw new ApiError(400, "INVALID_REQUEST", "contentId is required");
     }
 
     return normalizedContentId;
@@ -111,7 +89,10 @@ export class MwPlaybackService {
     );
 
     if (blockedCountries.includes(userCountry)) {
-      throw new GeoBlockedPlaybackError();
+      throw new DomainError(
+        "GEO_BLOCKED",
+        "Playback is not available in the user's country.",
+      );
     }
   }
 
@@ -123,7 +104,10 @@ export class MwPlaybackService {
       metadata.isPremium === true && metadata.quality === VIDEO_QUALITIES.UHD_4K;
 
     if (isPremium4K && requestContext.deviceType === "Mobile") {
-      throw new Premium4KPlaybackNotSupportedOnDeviceError();
+      throw new DomainError(
+        "DEVICE_NOT_SUPPORTED",
+        "Playback is not available on this device type.",
+      );
     }
   }
 }

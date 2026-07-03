@@ -1,11 +1,5 @@
 import { CONTENT_TYPES, type ContentType } from "./content-types.js";
-
-export class ContentHierarchyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ContentHierarchyError";
-  }
-}
+import { DomainError } from "../shared/domain/domain-error.js";
 
 const allowedParentByType: Record<ContentType, ContentType | null> = {
   [CONTENT_TYPES.SERIES]: null,
@@ -27,20 +21,25 @@ export function validateContentParent(
 
   if (expectedParentType === null) {
     if (parent !== null) {
-      throw new ContentHierarchyError(`${type} content cannot have a parent.`);
+      throw new DomainError(
+        "INVALID_CONTENT_HIERARCHY",
+        `${type} content cannot have a parent.`,
+      );
     }
 
     return;
   }
 
   if (parent === null) {
-    throw new ContentHierarchyError(
+    throw new DomainError(
+      "INVALID_CONTENT_HIERARCHY",
       `${type} content must belong to a ${expectedParentType}.`,
     );
   }
 
   if (parent.type !== expectedParentType) {
-    throw new ContentHierarchyError(
+    throw new DomainError(
+      "INVALID_CONTENT_HIERARCHY",
       `${type} content must belong to a ${expectedParentType}, but parent ${parent.id} is ${parent.type}.`,
     );
   }
