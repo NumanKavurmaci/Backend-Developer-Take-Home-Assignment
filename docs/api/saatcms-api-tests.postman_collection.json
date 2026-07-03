@@ -1,0 +1,154 @@
+{
+  "info": {
+    "name": "SaatCMS Middleware Core API Tests",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Successful metadata resolution",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/mw/content/episode-galactic-odyssey-s1e2"
+      }
+    },
+    {
+      "name": "Successful EPG creation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"programName\":\"Evening News\",\"startTime\":\"2026-07-02T18:00:00Z\",\"endTime\":\"2026-07-02T19:00:00Z\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg"
+      }
+    },
+    {
+      "name": "EPG overlap blocked",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"programName\":\"Overlapping News\",\"startTime\":\"2026-07-02T08:30:00Z\",\"endTime\":\"2026-07-02T09:30:00Z\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg"
+      }
+    },
+    {
+      "name": "Successful playback request",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-123"
+          },
+          {
+            "key": "X-User-Country",
+            "value": "TR"
+          },
+          {
+            "key": "X-Device-Type",
+            "value": "Web"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e2"
+      }
+    },
+    {
+      "name": "Geo-blocked playback request",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-123"
+          },
+          {
+            "key": "X-User-Country",
+            "value": "IR"
+          },
+          {
+            "key": "X-Device-Type",
+            "value": "Web"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e2"
+      }
+    },
+    {
+      "name": "Device-blocked playback request",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-123"
+          },
+          {
+            "key": "X-User-Country",
+            "value": "TR"
+          },
+          {
+            "key": "X-Device-Type",
+            "value": "Mobile"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e3"
+      }
+    }
+  ]
+}
