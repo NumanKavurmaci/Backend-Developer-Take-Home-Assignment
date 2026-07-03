@@ -21,7 +21,7 @@ The project focuses on the core domain problems from the case study: content met
 | EPG concurrency safety      | Transactional per-channel schedule-lock flow                                   |
 | Tests                       | Domain, service, and route coverage for the implemented scope                  |
 
-Playback entitlement, geofencing, and final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
+Device entitlement and final playback response rules are tracked as later assignment steps in `docs/project/project-steps.md`.
 
 ## Tech Stack
 
@@ -194,7 +194,7 @@ HTTP/1.1 404 Not Found
 GET /api/v1/mw/playback/{contentId}
 ```
 
-The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, and returns playback details for existing content.
+The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, checks geofencing, and returns playback details for allowed content.
 
 Required headers:
 
@@ -240,7 +240,26 @@ Response:
 }
 ```
 
-Geofencing and device entitlement blocking are added in the next playback steps.
+Device entitlement blocking is added in a later playback step.
+
+### Geo-blocked Playback
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: IR" \
+  -H "X-Device-Type: Web"
+```
+
+Response:
+
+```json
+{
+  "errorCode": "GEO_BLOCKED"
+}
+```
+
+Geo-blocked responses do not include `playbackUrl` or asset details.
 
 ### Missing Content
 

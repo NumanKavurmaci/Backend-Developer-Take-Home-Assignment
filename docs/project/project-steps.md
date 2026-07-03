@@ -552,6 +552,10 @@ The playback endpoint must check whether the user’s country is blocked by the 
 
 - Blocked users do not receive playback URL or asset details.
 
+### Implementation Status
+
+Implemented in `src/modules/mw-playback/`. Playback resolves metadata through the inheritance engine, compares `X-User-Country` against resolved `geoBlockCountries`, returns `403 Forbidden` with `GEO_BLOCKED` for blocked countries, and stops before returning playback details.
+
 ---
 
 ## 24. Device Restriction Rule

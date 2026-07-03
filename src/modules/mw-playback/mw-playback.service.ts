@@ -31,6 +31,11 @@ export type PlaybackResponse = {
   metadata: PlaybackResponseMetadata;
 };
 
+class GeoBlockedPlaybackError extends Error {
+  readonly errorCode = "GEO_BLOCKED";
+  readonly statusCode = 403;
+}
+
 export class MwPlaybackService {
   constructor(
     private readonly contentResolver: PlaybackContentResolver = (contentId) =>
@@ -43,6 +48,7 @@ export class MwPlaybackService {
   ): Promise<PlaybackResponse> {
     const normalizedContentId = this.normalizeContentId(contentId);
     const metadata = await this.resolvePlaybackMetadata(normalizedContentId);
+    this.assertUserCountryAllowed(requestContext, metadata);
 
     return {
       contentId: normalizedContentId,
@@ -86,5 +92,19 @@ export class MwPlaybackService {
     }
 
     return normalizedContentId;
+  }
+
+  private assertUserCountryAllowed(
+    requestContext: PlaybackRequestHeaders,
+    metadata: ResolvedContentMetadata,
+  ): void {
+    const userCountry = requestContext.userCountry.toUpperCase();
+    const blockedCountries = metadata.geoBlockCountries.map((country) =>
+      country.toUpperCase(),
+    );
+
+    if (blockedCountries.includes(userCountry)) {
+      throw new GeoBlockedPlaybackError();
+    }
   }
 }

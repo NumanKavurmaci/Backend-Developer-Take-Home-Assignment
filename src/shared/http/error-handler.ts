@@ -53,6 +53,10 @@ export const errorHandler: ErrorHandler = (error, c) => {
   const message =
     statusCode === 500 ? "Unexpected server error." : applicationError.message;
 
+  if (!message) {
+    return c.json({ errorCode }, statusCode);
+  }
+
   return c.json({ errorCode, message }, statusCode);
 };
 

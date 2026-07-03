@@ -1,12 +1,12 @@
 # Middleware Playback API
 
-The middleware playback endpoint validates the request context, resolves content metadata, and returns playback details for existing content.
+The middleware playback endpoint validates the request context, resolves content metadata, checks geofencing, and returns playback details for allowed content.
 
 ```http
 GET /api/v1/mw/playback/{contentId}
 ```
 
-At this stage, the endpoint performs content lookup and returns the resolved playback URL. Later assignment steps extend the same endpoint with geofencing and device entitlement blocking.
+At this stage, the endpoint performs content lookup, blocks geo-restricted requests, and returns the resolved playback URL. Later assignment steps extend the same endpoint with device entitlement blocking.
 
 ## Request
 
@@ -21,7 +21,7 @@ Required headers:
 | Header           | Required | Example    | Description                                      |
 | ---------------- | -------- | ---------- | ------------------------------------------------ |
 | `X-User-Id`      | yes      | `user-123` | User identifier supplied by the calling system.  |
-| `X-User-Country` | yes      | `TR`       | User country code used by later geofencing rules. |
+| `X-User-Country` | yes      | `TR`       | User country code checked against resolved geo-block metadata. |
 | `X-Device-Type`  | yes      | `Web`      | Playback device type used by later device rules. |
 
 Supported device types:
@@ -76,7 +76,7 @@ Example response:
 }
 ```
 
-Geofencing and device restriction failures are added in later playback steps.
+Device restriction failures are added in a later playback step.
 
 ## Error Responses
 
@@ -173,6 +173,24 @@ Example response:
 }
 ```
 
+### Geo-blocked Playback
+
+Example response:
+
+```json
+{
+  "errorCode": "GEO_BLOCKED"
+}
+```
+
+Status:
+
+```http
+403 Forbidden
+```
+
+Geo-blocked responses do not include `playbackUrl` or asset details.
+
 ## Implementation Map
 
 | Layer      | File                                                   |
@@ -192,6 +210,7 @@ HTTP request
   -> header helper validates required headers and device type
   -> service normalizes contentId
   -> metadata inheritance engine resolves content metadata
+  -> service rejects geo-blocked countries
   -> controller returns playback URL and resolved metadata
 ```
 
@@ -205,9 +224,10 @@ Implemented now:
 - `contentId` normalization at the service boundary
 - Content lookup through the metadata inheritance engine
 - Missing content returns `404 Not Found`
+- Geofencing checks `X-User-Country` against resolved `geoBlockCountries`
+- Geo-blocked requests return `403 Forbidden` with `GEO_BLOCKED`
 - Successful response includes playback URL and resolved metadata
 
 Planned in later steps:
 
-- Geofencing rule
 - Device restriction rule

@@ -318,6 +318,25 @@ describe("Middleware playback request headers", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("rejects playback when the user country is geo-blocked", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "IR",
+          "X-Device-Type": "Web",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "GEO_BLOCKED",
+    });
+
+    expect(response.status).toBe(403);
+  });
 });
 
 describe("Middleware playback service", () => {
@@ -377,6 +396,19 @@ describe("Middleware playback service", () => {
         isPremium: false,
         geoBlockCountries: ["IR", "SY"],
       },
+    });
+  });
+
+  it("rejects geo-blocked users before returning playback details", async () => {
+    await expect(
+      createTestService().getPlayback("episode-galactic-odyssey-s1e2", {
+        userId: "user-123",
+        userCountry: "sy",
+        deviceType: "Web",
+      }),
+    ).rejects.toMatchObject({
+      errorCode: "GEO_BLOCKED",
+      statusCode: 403,
     });
   });
 });
