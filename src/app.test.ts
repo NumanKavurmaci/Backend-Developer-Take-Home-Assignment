@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "./app.js";
 
 describe("Hono app scaffold", () => {
+  it("returns a signed home page response", async () => {
+    const response = await createApp().request("/");
+
+    await expect(response.json()).resolves.toEqual({
+      project: "SaatCMS Middleware Core",
+      message: "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
+      author: "Numan Kavurmacı",
+      location: "Samsun, Türkiye",
+      signedDate: "2026-07-03",
+    });
+    expect(response.status).toBe(200);
+  });
+
   it("returns health status", async () => {
     const response = await createApp().request("/health");
 

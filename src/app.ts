@@ -12,6 +12,16 @@ export function createApp() {
   app.onError(errorHandler);
   app.notFound(notFoundHandler);
 
+  app.get("/", (c) =>
+    c.json({
+      project: "SaatCMS Middleware Core",
+      message: "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
+      author: "Numan Kavurmacı",
+      location: "Samsun, Türkiye",
+      signedDate: "2026-07-03",
+    }),
+  );
+
   HealthModule.register(app);
   MwContentModule.register(app);
   CmsEpgProgramModule.register(app);

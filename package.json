@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "SaatCMS OTT middleware core prototype.",
+  "author": "Numan Kavurmacı",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
