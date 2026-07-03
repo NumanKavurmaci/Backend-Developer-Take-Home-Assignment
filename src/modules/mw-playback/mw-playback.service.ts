@@ -1,33 +1,90 @@
 import { HTTPException } from "hono/http-exception";
+import { prisma } from "../../db/client.js";
+import {
+  ContentNotFoundError,
+  resolveContentMetadata,
+  type ResolvedContentMetadata,
+} from "../../content/metadata-inheritance.js";
 import type { PlaybackRequestHeaders } from "./playback-request-headers.js";
 
-export type PlaybackHeaderValidationResponse = {
+type PlaybackContentResolver = (
+  contentId: string,
+) => Promise<ResolvedContentMetadata>;
+
+type PlaybackResponseMetadata = Pick<
+  ResolvedContentMetadata,
+  | "type"
+  | "title"
+  | "parentalRating"
+  | "genre"
+  | "quality"
+  | "isPremium"
+  | "geoBlockCountries"
+>;
+
+export type PlaybackResponse = {
   contentId: string;
   requestContext: PlaybackRequestHeaders;
+  playback: {
+    playbackUrl: string | null;
+  };
+  metadata: PlaybackResponseMetadata;
 };
 
 export class MwPlaybackService {
-  async getPlaybackHeaderValidationResult(
+  constructor(
+    private readonly contentResolver: PlaybackContentResolver = (contentId) =>
+      resolveContentMetadata(prisma, contentId),
+  ) {}
+
+  async getPlayback(
     contentId: string | undefined,
     requestContext: PlaybackRequestHeaders,
-  ): Promise<PlaybackHeaderValidationResponse> {
-    const normalizedContentId = normalizeContentId(contentId);
+  ): Promise<PlaybackResponse> {
+    const normalizedContentId = this.normalizeContentId(contentId);
+    const metadata = await this.resolvePlaybackMetadata(normalizedContentId);
 
     return {
       contentId: normalizedContentId,
       requestContext,
+      playback: {
+        playbackUrl: metadata.playbackUrl,
+      },
+      metadata: {
+        type: metadata.type,
+        title: metadata.title,
+        parentalRating: metadata.parentalRating,
+        genre: metadata.genre,
+        quality: metadata.quality,
+        isPremium: metadata.isPremium,
+        geoBlockCountries: metadata.geoBlockCountries,
+      },
     };
   }
-}
 
-function normalizeContentId(contentId: string | undefined): string {
-  const normalizedContentId = contentId?.trim();
+  private async resolvePlaybackMetadata(contentId: string) {
+    try {
+      return await this.contentResolver(contentId);
+    } catch (error) {
+      if (error instanceof ContentNotFoundError) {
+        throw new HTTPException(404, {
+          message: "Content not found",
+        });
+      }
 
-  if (!normalizedContentId) {
-    throw new HTTPException(400, {
-      message: "contentId is required",
-    });
+      throw error;
+    }
   }
 
-  return normalizedContentId;
+  private normalizeContentId(contentId: string | undefined): string {
+    const normalizedContentId = contentId?.trim();
+
+    if (!normalizedContentId) {
+      throw new HTTPException(400, {
+        message: "contentId is required",
+      });
+    }
+
+    return normalizedContentId;
+  }
 }

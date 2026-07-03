@@ -1,12 +1,12 @@
 # Middleware Playback API
 
-The middleware playback endpoint validates the request context needed for playback authorization.
+The middleware playback endpoint validates the request context, resolves content metadata, and returns playback details for existing content.
 
 ```http
 GET /api/v1/mw/playback/{contentId}
 ```
 
-At this stage, the endpoint focuses on request header handling. Later assignment steps will extend the same endpoint with content lookup, geofencing, device entitlement rules, and the final playback response.
+At this stage, the endpoint performs content lookup and returns the resolved playback URL. Later assignment steps extend the same endpoint with geofencing and device entitlement blocking.
 
 ## Request
 
@@ -51,7 +51,7 @@ Status:
 200 OK
 ```
 
-Current Step 21 response:
+Example response:
 
 ```json
 {
@@ -60,11 +60,23 @@ Current Step 21 response:
     "userId": "user-123",
     "userCountry": "TR",
     "deviceType": "Web"
+  },
+  "playback": {
+    "playbackUrl": "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8"
+  },
+  "metadata": {
+    "type": "EPISODE",
+    "title": "Dark Side Relay",
+    "parentalRating": "16+",
+    "genre": "Space Adventure",
+    "quality": "HD",
+    "isPremium": false,
+    "geoBlockCountries": ["IR", "SY"]
   }
 }
 ```
 
-This temporary response intentionally echoes the normalized request context so header handling can be tested clearly. It will be replaced by the final playback payload in later playback steps.
+Geofencing and device restriction failures are added in later playback steps.
 
 ## Error Responses
 
@@ -150,6 +162,17 @@ Example response:
 }
 ```
 
+### Missing Content
+
+Example response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "Content not found"
+}
+```
+
 ## Implementation Map
 
 | Layer      | File                                                   |
@@ -168,7 +191,8 @@ HTTP request
   -> controller reads contentId and playback headers
   -> header helper validates required headers and device type
   -> service normalizes contentId
-  -> controller returns the current validation response
+  -> metadata inheritance engine resolves content metadata
+  -> controller returns playback URL and resolved metadata
 ```
 
 ## Current Scope
@@ -179,10 +203,11 @@ Implemented now:
 - Missing-header errors
 - Supported device-type validation
 - `contentId` normalization at the service boundary
+- Content lookup through the metadata inheritance engine
+- Missing content returns `404 Not Found`
+- Successful response includes playback URL and resolved metadata
 
 Planned in later steps:
 
-- Content lookup
 - Geofencing rule
 - Device restriction rule
-- Final playback success payload

@@ -194,7 +194,7 @@ HTTP/1.1 404 Not Found
 GET /api/v1/mw/playback/{contentId}
 ```
 
-The playback endpoint receives the request context needed for later entitlement checks. At the current stage, it validates the required headers and returns the normalized request context.
+The playback endpoint receives the request context needed for entitlement checks, resolves content metadata, and returns playback details for existing content.
 
 Required headers:
 
@@ -206,7 +206,7 @@ Required headers:
 
 Supported device types are `Mobile`, `SmartTV`, and `Web`.
 
-### Successful Header Validation
+### Successful Playback Request
 
 ```bash
 curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
@@ -215,7 +215,7 @@ curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
   -H "X-Device-Type: Web"
 ```
 
-Current Step 21 response:
+Response:
 
 ```json
 {
@@ -224,11 +224,41 @@ Current Step 21 response:
     "userId": "user-123",
     "userCountry": "TR",
     "deviceType": "Web"
+  },
+  "playback": {
+    "playbackUrl": "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8"
+  },
+  "metadata": {
+    "type": "EPISODE",
+    "title": "Dark Side Relay",
+    "parentalRating": "16+",
+    "genre": "Space Adventure",
+    "quality": "HD",
+    "isPremium": false,
+    "geoBlockCountries": ["IR", "SY"]
   }
 }
 ```
 
-This temporary response is intentional: it makes header handling easy to verify before the later playback entitlement rules are added.
+Geofencing and device entitlement blocking are added in the next playback steps.
+
+### Missing Content
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/missing-content \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TR" \
+  -H "X-Device-Type: Web"
+```
+
+Response:
+
+```json
+{
+  "errorCode": "REQUEST_FAILED",
+  "message": "Content not found"
+}
+```
 
 ### Missing Header
 

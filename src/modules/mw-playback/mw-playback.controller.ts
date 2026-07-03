@@ -9,11 +9,10 @@ export class MwPlaybackController {
     const contentId = c.req.param("contentId");
     const requestContext = readPlaybackRequestHeaders(c);
 
-    const result =
-      await this.mwPlaybackService.getPlaybackHeaderValidationResult(
-        contentId,
-        requestContext,
-      );
+    const result = await this.mwPlaybackService.getPlayback(
+      contentId,
+      requestContext,
+    );
 
     return c.json(result);
   }

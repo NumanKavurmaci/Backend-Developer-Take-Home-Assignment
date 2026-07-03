@@ -523,6 +523,10 @@ GET /api/v1/mw/playback/{contentId}
 - Missing content returns `404 Not Found`.
 - Successful response includes playback details or asset details.
 
+### Implementation Status
+
+Implemented in `src/modules/mw-playback/`. The endpoint now reads the required playback headers, resolves content metadata through the inheritance engine, returns `404 Not Found` for missing content, and includes the resolved `playbackUrl` in the successful response. Geofencing and device entitlement failures remain separate later steps.
+
 ---
 
 ## 23. Geofencing Rule

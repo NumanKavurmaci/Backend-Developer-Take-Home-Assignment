@@ -1,5 +1,8 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
+import { CONTENT_TYPES } from "../../content/content-types.js";
+import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
+import { ContentNotFoundError } from "../../content/metadata-inheritance.js";
 import {
   errorHandler,
   notFoundHandler,
@@ -8,7 +11,27 @@ import { MwPlaybackController } from "./mw-playback.controller.js";
 import { createMwPlaybackRoutes } from "./mw-playback.route.js";
 import { MwPlaybackService } from "./mw-playback.service.js";
 
-function createTestApp() {
+function createTestService() {
+  return new MwPlaybackService(async (contentId) => {
+    if (contentId === "missing-content") {
+      throw new ContentNotFoundError(contentId);
+    }
+
+    return {
+      contentId,
+      type: CONTENT_TYPES.EPISODE,
+      title: "Dark Side Relay",
+      parentalRating: "16+",
+      genre: "Space Adventure",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      playbackUrl: "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
+      geoBlockCountries: ["IR", "SY"],
+    };
+  });
+}
+
+function createTestApp(service = createTestService()) {
   const app = new Hono();
 
   app.onError(errorHandler);
@@ -16,7 +39,7 @@ function createTestApp() {
 
   app.route(
     "/api/v1/mw/playback",
-    createMwPlaybackRoutes(new MwPlaybackController(new MwPlaybackService())),
+    createMwPlaybackRoutes(new MwPlaybackController(service)),
   );
 
   return app;
@@ -42,6 +65,19 @@ describe("Middleware playback request headers", () => {
         userCountry: "TR",
         deviceType: "Web",
       },
+      playback: {
+        playbackUrl:
+          "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
+      },
+      metadata: {
+        type: CONTENT_TYPES.EPISODE,
+        title: "Dark Side Relay",
+        parentalRating: "16+",
+        genre: "Space Adventure",
+        quality: VIDEO_QUALITIES.HD,
+        isPremium: false,
+        geoBlockCountries: ["IR", "SY"],
+      },
     });
 
     expect(response.status).toBe(200);
@@ -65,6 +101,19 @@ describe("Middleware playback request headers", () => {
         userId: "user-123",
         userCountry: "TR",
         deviceType: "Web",
+      },
+      playback: {
+        playbackUrl:
+          "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
+      },
+      metadata: {
+        type: CONTENT_TYPES.EPISODE,
+        title: "Dark Side Relay",
+        parentalRating: "16+",
+        genre: "Space Adventure",
+        quality: VIDEO_QUALITIES.HD,
+        isPremium: false,
+        geoBlockCountries: ["IR", "SY"],
       },
     });
 
@@ -249,12 +298,32 @@ describe("Middleware playback request headers", () => {
 
     expect(response.status).toBe(400);
   });
+
+  it("returns not found when requested content does not exist", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/missing-content",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "Web",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "REQUEST_FAILED",
+      message: "Content not found",
+    });
+
+    expect(response.status).toBe(404);
+  });
 });
 
 describe("Middleware playback service", () => {
   it("rejects missing contentId", async () => {
     await expect(
-      new MwPlaybackService().getPlaybackHeaderValidationResult(undefined, {
+      createTestService().getPlayback(undefined, {
         userId: "user-123",
         userCountry: "TR",
         deviceType: "Web",
@@ -267,7 +336,7 @@ describe("Middleware playback service", () => {
 
   it("rejects blank contentId", async () => {
     await expect(
-      new MwPlaybackService().getPlaybackHeaderValidationResult("   ", {
+      createTestService().getPlayback("   ", {
         userId: "user-123",
         userCountry: "TR",
         deviceType: "Web",
@@ -280,7 +349,7 @@ describe("Middleware playback service", () => {
 
   it("trims contentId", async () => {
     await expect(
-      new MwPlaybackService().getPlaybackHeaderValidationResult(
+      createTestService().getPlayback(
         "  episode-galactic-odyssey-s1e2  ",
         {
           userId: "user-123",
@@ -294,6 +363,19 @@ describe("Middleware playback service", () => {
         userId: "user-123",
         userCountry: "TR",
         deviceType: "Web",
+      },
+      playback: {
+        playbackUrl:
+          "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
+      },
+      metadata: {
+        type: CONTENT_TYPES.EPISODE,
+        title: "Dark Side Relay",
+        parentalRating: "16+",
+        genre: "Space Adventure",
+        quality: VIDEO_QUALITIES.HD,
+        isPremium: false,
+        geoBlockCountries: ["IR", "SY"],
       },
     });
   });
