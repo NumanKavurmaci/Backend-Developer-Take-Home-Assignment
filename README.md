@@ -83,7 +83,10 @@ curl http://localhost:3000/health
 | Content domain | [docs/domain/content-domain-index.md](docs/domain/content-domain-index.md) |
 | Live channel domain | [docs/domain/live-channel-domain-index.md](docs/domain/live-channel-domain-index.md) |
 | Assignment notes | [docs/project/assignment.md](docs/project/assignment.md) |
+| Assignment PDF | [docs/project/Saat_Teknoloji_CMS_MW_Assignment_Final.pdf](docs/project/Saat_Teknoloji_CMS_MW_Assignment_Final.pdf) |
 | Project steps | [docs/project/project-steps.md](docs/project/project-steps.md) |
+| Technical improvement recommendations | [docs/project/SaatCMS_Technical_Improvement_Recommendations.md](docs/project/SaatCMS_Technical_Improvement_Recommendations.md) |
+| Post-release fixes | [docs/project/post-release-fixes.md](docs/project/post-release-fixes.md) |
 
 ## Project Structure
 
