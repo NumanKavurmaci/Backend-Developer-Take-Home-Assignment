@@ -83,7 +83,7 @@ The decision document should also define whether existing SQLite records need to
 
 # PG-02 - Provide Local PostgreSQL Environment
 
-**Status:** Implemented — the end-to-end Prisma migration smoke test completes with PG-03.
+**Status:** Complete — PostgreSQL startup, migration, seed, connectivity, and `/ready` smoke tests pass.
 
 ## Description
 
@@ -120,6 +120,8 @@ A developer should be able to start PostgreSQL, create the database, run migrati
 ---
 
 # PG-03 - Rebuild Prisma Schema and Migration History for PostgreSQL
+
+**Status:** Complete — the empty-database migration, seed, and PostgreSQL test suite pass.
 
 ## Description
 

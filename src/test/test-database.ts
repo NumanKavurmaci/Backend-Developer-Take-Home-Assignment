@@ -1,7 +1,8 @@
-import initSqlJs from "sql.js";
+import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@prisma/client";
 
@@ -11,6 +12,7 @@ const rootDir = path.resolve(
   "..",
 );
 const envLinePattern = /^DATABASE_URL=(?:"([^"]+)"|'([^']+)'|(.+))$/m;
+const execFileAsync = promisify(execFile);
 
 export async function readTestDatabaseUrl(): Promise<string> {
   return readDatabaseUrlFromEnvFile(".env.test");
@@ -23,30 +25,13 @@ export async function configureTestDatabaseUrl(): Promise<void> {
 export async function recreateTestDatabase(): Promise<void> {
   const databaseUrl = await readTestDatabaseUrl();
   assertUsingTestDatabase(databaseUrl);
-
-  const databasePath = resolveSqlitePath(databaseUrl);
-  await rm(databasePath, { force: true });
-  await mkdir(path.dirname(databasePath), { recursive: true });
-
-  const SQL = await initSqlJs({
-    locateFile: (file) =>
-      path.join(rootDir, "node_modules", "sql.js", "dist", file),
-  });
-  const db = new SQL.Database();
-
-  db.run("PRAGMA foreign_keys = OFF;");
-  db.run(await readMigrationSql());
-  db.run("PRAGMA foreign_keys = ON;");
-
-  await writeFile(databasePath, Buffer.from(db.export()));
-  db.close();
+  await resetTestDatabase(databaseUrl);
 }
 
 export async function removeTestDatabase(): Promise<void> {
   const databaseUrl = await readTestDatabaseUrl();
   assertUsingTestDatabase(databaseUrl);
-
-  await rm(resolveSqlitePath(databaseUrl), { force: true });
+  await resetTestDatabase(databaseUrl);
 }
 
 export function assertUsingTestDatabase(
@@ -56,12 +41,25 @@ export function assertUsingTestDatabase(
     throw new Error("DATABASE_URL must be set before running database tests.");
   }
 
-  const databasePath = resolveSqlitePath(databaseUrl);
-  const expectedTestPath = resolveSqlitePath("file:../data/test.db");
+  let parsedUrl: URL;
 
-  if (databasePath !== expectedTestPath) {
+  try {
+    parsedUrl = new URL(databaseUrl);
+  } catch {
+    throw new Error("DATABASE_URL must be a valid PostgreSQL URL.");
+  }
+
+  const isPostgreSql = ["postgres:", "postgresql:"].includes(
+    parsedUrl.protocol,
+  );
+  const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(
+    parsedUrl.hostname,
+  );
+  const isTestDatabase = parsedUrl.pathname === "/saatcms_test";
+
+  if (!isPostgreSql || !isLocalHost || !isTestDatabase) {
     throw new Error(
-      `Refusing to run destructive test cleanup against non-test database: ${databasePath}`,
+      "Refusing to run destructive test cleanup against a non-local or non-test PostgreSQL database.",
     );
   }
 }
@@ -102,42 +100,24 @@ async function readDatabaseUrlFromEnvFile(fileName: string): Promise<string> {
   return databaseUrl;
 }
 
-function resolveSqlitePath(databaseUrl: string): string {
-  if (!databaseUrl.startsWith("file:")) {
-    throw new Error("Only SQLite file: DATABASE_URL values are supported.");
-  }
+async function resetTestDatabase(databaseUrl: string): Promise<void> {
+  const prismaCliPath = path.join(
+    rootDir,
+    "node_modules",
+    "prisma",
+    "build",
+    "index.js",
+  );
 
-  return path.resolve(rootDir, "prisma", databaseUrl.slice("file:".length));
-}
-
-async function readMigrationSql(): Promise<string> {
-  const migrationsDir = path.join(rootDir, "prisma", "migrations");
-  const migrationDirs = (await readdir(migrationsDir, { withFileTypes: true }))
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-
-  if (migrationDirs.length === 0) {
-    throw new Error("No migration directories found under prisma/migrations.");
-  }
-
-  const statements = [];
-
-  for (const migrationDir of migrationDirs) {
-    const migrationPath = path.join(
-      migrationsDir,
-      migrationDir,
-      "migration.sql",
-    );
-
-    if (existsSync(migrationPath)) {
-      statements.push(await readFile(migrationPath, "utf8"));
-    }
-  }
-
-  if (statements.length === 0) {
-    throw new Error("No migration.sql files found under prisma/migrations.");
-  }
-
-  return statements.join("\n\n");
+  await execFileAsync(
+    process.execPath,
+    [prismaCliPath, "migrate", "reset", "--force", "--skip-seed"],
+    {
+      cwd: rootDir,
+      env: {
+        ...process.env,
+        DATABASE_URL: databaseUrl,
+      },
+    },
+  );
 }

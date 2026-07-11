@@ -1050,7 +1050,9 @@ describe("metadata inheritance test cases", () => {
   });
 
   it("rejects incomplete raw hierarchy data before resolving metadata", async () => {
-    await prisma.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Content" DROP CONSTRAINT "Content_parentId_fkey"',
+    );
 
     try {
       await prisma.content.create({
@@ -1061,15 +1063,21 @@ describe("metadata inheritance test cases", () => {
           parentId: "missing-series",
         },
       });
-    } finally {
-      await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
-    }
 
-    await expect(
-      resolveContentMetadata(prisma, "orphan-season"),
-    ).rejects.toThrow(
-      "Content hierarchy is incomplete for orphan-season; missing parent missing-series.",
-    );
+      await expect(
+        resolveContentMetadata(prisma, "orphan-season"),
+      ).rejects.toThrow(
+        "Content hierarchy is incomplete for orphan-season; missing parent missing-series.",
+      );
+    } finally {
+      await prisma.content.deleteMany({ where: { id: "orphan-season" } });
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Content"
+        ADD CONSTRAINT "Content_parentId_fkey"
+        FOREIGN KEY ("parentId") REFERENCES "Content"("id")
+        ON DELETE RESTRICT ON UPDATE CASCADE
+      `);
+    }
   });
 });
 

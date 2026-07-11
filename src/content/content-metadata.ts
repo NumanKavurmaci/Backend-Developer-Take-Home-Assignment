@@ -22,7 +22,7 @@ export const PLAYBACK_METADATA_FIELDS = [
 
 export type PlaybackMetadataField = (typeof PLAYBACK_METADATA_FIELDS)[number];
 
-// Stored as strings in SQLite, validated in the domain layer before writes.
+// Stored as strings in PostgreSQL, validated in the domain layer before writes.
 export const VIDEO_QUALITIES = {
   SD: "SD",
   HD: "HD",

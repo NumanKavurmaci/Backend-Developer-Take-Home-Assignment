@@ -15,14 +15,18 @@ afterAll(async () => {
 describe("test database safety guard", () => {
   it("accepts the dedicated disposable test database", () => {
     expect(() =>
-      assertUsingTestDatabase("file:../data/test.db"),
+      assertUsingTestDatabase(
+        "postgresql://saatcms:saatcms_local@localhost:5432/saatcms_test?schema=public",
+      ),
     ).not.toThrow();
   });
 
   it("rejects the development database before destructive cleanup", () => {
-    expect(() => assertUsingTestDatabase("file:../data/dev.db")).toThrow(
-      "Refusing to run destructive test cleanup against non-test database",
-    );
+    expect(() =>
+      assertUsingTestDatabase(
+        "postgresql://saatcms:saatcms_local@localhost:5432/saatcms?schema=public",
+      ),
+    ).toThrow("Refusing to run destructive test cleanup");
   });
 
   it("clears content data from the disposable test database", async () => {

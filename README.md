@@ -8,7 +8,7 @@ The project implements the core middleware and CMS scheduling concerns from the 
 
 | Area | Implemented |
 | --- | --- |
-| Runtime | TypeScript, Hono, Prisma; PostgreSQL 18 migration in progress |
+| Runtime | TypeScript, Hono, Prisma, PostgreSQL 18 |
 | Health check | `GET /health` liveness and `GET /ready` database readiness |
 | Metadata inheritance | `Series -> Season -> Episode` resolution |
 | Content metadata API | `GET /api/v1/mw/content/{contentId}` |
@@ -38,10 +38,7 @@ The API runs locally at:
 http://localhost:3000
 ```
 
-The PostgreSQL migration is delivered in ordered steps. PG-02 provides the
-local PostgreSQL service and configuration; the Prisma migration and seed
-commands in this quick start become executable against PostgreSQL when PG-03
-replaces the active SQLite schema and migration history.
+The active Prisma schema and committed migration history target PostgreSQL.
 
 ### Local PostgreSQL
 
@@ -176,7 +173,7 @@ npm test
 npm run test:coverage
 ```
 
-The tests use `.env.test` and create a disposable SQLite database at `data/test.db`. The suite recreates that database before tests and removes it afterward. Destructive test cleanup has a safety guard and refuses to run against the development database at `data/dev.db`.
+The tests use `.env.test` and rebuild the dedicated `saatcms_test` PostgreSQL database from committed migrations. Destructive cleanup has a safety guard and refuses non-local hosts and any database not named `saatcms_test`.
 
 Coverage includes application source under `src` and excludes tests, test helpers, docs-only checks, generated/build output, and CLI entrypoints that start long-running processes. The global line coverage threshold is 90%.
 

@@ -21,8 +21,7 @@ const epgScheduleTimes = {
   marketWatchEnd: "2026-07-02T10:00:00.000Z",
 } as const;
 
-const UTC_TIMESTAMP_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 function readSeedUtcDate(value: string): Date {
   if (!UTC_TIMESTAMP_PATTERN.test(value)) {
@@ -39,13 +38,14 @@ function readSeedUtcDate(value: string): Date {
 }
 
 async function clearExistingData() {
-  await prisma.$transaction([
-    prisma.epgProgram.deleteMany(),
-    prisma.epgScheduleLock.deleteMany(),
-    prisma.liveChannel.deleteMany(),
-    prisma.contentGeoBlockCountry.deleteMany(),
-    prisma.content.deleteMany(),
-  ]);
+  await prisma.$transaction(async (transaction) => {
+    await transaction.epgProgram.deleteMany();
+    await transaction.epgScheduleLock.deleteMany();
+    await transaction.liveChannel.deleteMany();
+    await transaction.contentGeoBlockCountry.deleteMany();
+    await transaction.content.updateMany({ data: { parentId: null } });
+    await transaction.content.deleteMany();
+  });
 }
 
 async function seedContent() {
