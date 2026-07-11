@@ -14,7 +14,7 @@ export type PlaybackRequestHeaders = {
 export function readPlaybackRequestHeaders(c: Context): PlaybackRequestHeaders {
   return {
     userId: readRequiredHeader(c, "X-User-Id"),
-    userCountry: readRequiredHeader(c, "X-User-Country"),
+    userCountry: readCountryHeader(c),
     deviceType: readDeviceTypeHeader(c),
   };
 }
@@ -27,6 +27,20 @@ function readRequiredHeader(c: Context, headerName: string): string {
       400,
       "MISSING_HEADER",
       `${headerName} header is required`,
+    );
+  }
+
+  return value;
+}
+
+function readCountryHeader(c: Context): string {
+  const value = readRequiredHeader(c, "X-User-Country").toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(value)) {
+    throw new ApiError(
+      400,
+      "INVALID_COUNTRY_CODE",
+      "X-User-Country must be a two-letter country code",
     );
   }
 

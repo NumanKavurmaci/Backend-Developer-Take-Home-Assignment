@@ -21,8 +21,8 @@ Required headers:
 | Header           | Required | Example    | Description                                      |
 | ---------------- | -------- | ---------- | ------------------------------------------------ |
 | `X-User-Id`      | yes      | `user-123` | User identifier supplied by the calling system.  |
-| `X-User-Country` | yes      | `TR`       | User country code checked against resolved geo-block metadata. |
-| `X-Device-Type`  | yes      | `Web`      | Playback device type checked against resolved playback metadata. |
+| `X-User-Country` | yes      | `TR`       | Two-letter country code checked against resolved geo-block metadata. |
+| `X-Device-Type`  | yes      | `Web`      | Strict playback device type checked against resolved playback metadata. |
 
 Supported device types:
 
@@ -33,6 +33,15 @@ Web
 ```
 
 Header values are trimmed before validation. Empty header values are treated as missing.
+
+Country behavior:
+
+- `X-User-Country` is normalized to uppercase.
+- Valid values must contain exactly two letters, such as `TR`, `US`, or `DE`.
+- `tr` is accepted and normalized to `TR`.
+- `T`, `TUR`, `T1`, `T-`, and `12` are rejected.
+
+Device behavior is strict and case-sensitive. Only `Mobile`, `SmartTV`, and `Web` are accepted. Values such as `mobile`, `smarttv`, `web`, and `Console` are rejected.
 
 ## Success Response
 
@@ -162,6 +171,32 @@ Example response:
 }
 ```
 
+### Invalid User Country
+
+Example request:
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TUR" \
+  -H "X-Device-Type: Web"
+```
+
+Status:
+
+```http
+400 Bad Request
+```
+
+Example response:
+
+```json
+{
+  "errorCode": "INVALID_COUNTRY_CODE",
+  "message": "X-User-Country must be a two-letter country code"
+}
+```
+
 ### Missing Content
 
 Example response:
@@ -250,7 +285,8 @@ Implemented now:
 
 - Required playback headers
 - Missing-header errors
-- Supported device-type validation
+- Country-code normalization and validation
+- Strict supported device-type validation
 - `contentId` normalization at the service boundary
 - Content lookup through the metadata inheritance engine
 - Missing content returns `404 Not Found`

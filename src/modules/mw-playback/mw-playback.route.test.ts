@@ -160,6 +160,27 @@ describe("Middleware playback request headers", () => {
     expect(response.status).toBe(200);
   });
 
+  it("normalizes lowercase country codes to uppercase", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "tr",
+          "X-Device-Type": "Web",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      requestContext: {
+        userCountry: "TR",
+      },
+    });
+
+    expect(response.status).toBe(200);
+  });
+
   it("accepts Mobile as a supported device type", async () => {
     const response = await createTestApp().request(
       "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
@@ -280,6 +301,29 @@ describe("Middleware playback request headers", () => {
     expect(response.status).toBe(400);
   });
 
+  it.each(["T", "TUR", "T1", "T-", "12"])(
+    "rejects malformed X-User-Country header value %s",
+    async (country) => {
+      const response = await createTestApp().request(
+        "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
+        {
+          headers: {
+            "X-User-Id": "user-123",
+            "X-User-Country": country,
+            "X-Device-Type": "Web",
+          },
+        },
+      );
+
+      await expect(response.json()).resolves.toEqual({
+        errorCode: "INVALID_COUNTRY_CODE",
+        message: "X-User-Country must be a two-letter country code",
+      });
+
+      expect(response.status).toBe(400);
+    },
+  );
+
   it("rejects missing X-Device-Type header", async () => {
     const response = await createTestApp().request(
       "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
@@ -327,6 +371,26 @@ describe("Middleware playback request headers", () => {
           "X-User-Id": "user-123",
           "X-User-Country": "TR",
           "X-Device-Type": "Console",
+        },
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "INVALID_DEVICE_TYPE",
+      message: "X-Device-Type must be one of: Mobile, SmartTV, Web",
+    });
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects lowercase X-Device-Type because device type matching is strict", async () => {
+    const response = await createTestApp().request(
+      "/api/v1/mw/playback/episode-galactic-odyssey-s1e2",
+      {
+        headers: {
+          "X-User-Id": "user-123",
+          "X-User-Country": "TR",
+          "X-Device-Type": "web",
         },
       },
     );

@@ -188,6 +188,45 @@
           }
         }
       ]
+    },
+    {
+      "name": "Malformed country header",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "X-User-Id",
+            "value": "user-123"
+          },
+          {
+            "key": "X-User-Country",
+            "value": "TUR"
+          },
+          {
+            "key": "X-Device-Type",
+            "value": "Web"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e2"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"malformed country header returns stable error\", function () {",
+              "  pm.response.to.have.status(400);",
+              "  pm.expect(pm.response.json().errorCode).to.eql(\"INVALID_COUNTRY_CODE\");",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

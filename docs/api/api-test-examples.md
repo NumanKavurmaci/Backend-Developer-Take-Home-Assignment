@@ -268,6 +268,40 @@ HTTP/1.1 403 Forbidden
 }
 ```
 
+### 7. Malformed Country Header
+
+Request headers:
+
+```http
+Accept: application/json
+X-User-Id: user-123
+X-User-Country: TUR
+X-Device-Type: Web
+```
+
+Request body: none.
+
+```bash
+curl -i http://localhost:3000/api/v1/mw/playback/episode-galactic-odyssey-s1e2 \
+  -H "Accept: application/json" \
+  -H "X-User-Id: user-123" \
+  -H "X-User-Country: TUR" \
+  -H "X-Device-Type: Web"
+```
+
+Example response:
+
+```http
+HTTP/1.1 400 Bad Request
+```
+
+```json
+{
+  "errorCode": "INVALID_COUNTRY_CODE",
+  "message": "X-User-Country must be a two-letter country code"
+}
+```
+
 ## Postman Requests
 
 Create a Postman collection with this environment variable:
@@ -357,6 +391,16 @@ Body:
 | Headers | `Accept: application/json`, `X-User-Id: user-123`, `X-User-Country: TR`, `X-Device-Type: Mobile` |
 | Body | None |
 | Expected status | `403 Forbidden` |
+
+### Malformed Country Header
+
+| Field | Value |
+| --- | --- |
+| Method | `GET` |
+| URL | `{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e2` |
+| Headers | `Accept: application/json`, `X-User-Id: user-123`, `X-User-Country: TUR`, `X-Device-Type: Web` |
+| Body | None |
+| Expected status | `400 Bad Request` |
 
 ## Importable Postman Collection
 
