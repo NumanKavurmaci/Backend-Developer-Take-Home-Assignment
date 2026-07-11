@@ -6,7 +6,14 @@ import { CONTENT_TYPES } from "../../content/content-types.js";
 import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
 import { MwContentController } from "./mw-content.controller.js";
 import { createMwContentRoutes } from "./mw-content.route.js";
-import type { MwContentService } from "./mw-content.service.js";
+import {
+  toPublicContentResponse,
+  type MwContentService,
+} from "./mw-content.service.js";
+
+function expectNoPlaybackUrl(value: unknown): void {
+  expect(JSON.stringify(value)).not.toContain("playbackUrl");
+}
 
 function createTestApp(service: Pick<MwContentService, "getResolvedContent">) {
   const app = new Hono();
@@ -31,7 +38,6 @@ describe("content metadata API routes", () => {
       genre: "Space Adventure",
       quality: VIDEO_QUALITIES.HD,
       isPremium: false,
-      playbackUrl: "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
       geoBlockCountries: ["IR", "SY"],
     });
 
@@ -39,7 +45,27 @@ describe("content metadata API routes", () => {
       "/api/v1/mw/content/episode-galactic-odyssey-s1e2",
     );
 
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+
+    expect(body).toEqual({
+      contentId: "episode-galactic-odyssey-s1e2",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Dark Side Relay",
+      parentalRating: "16+",
+      genre: "Space Adventure",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    expectNoPlaybackUrl(body);
+    expect(response.status).toBe(200);
+    expect(getResolvedContent).toHaveBeenCalledWith(
+      "episode-galactic-odyssey-s1e2",
+    );
+  });
+
+  it("maps internal metadata to a public response without playbackUrl", () => {
+    const response = toPublicContentResponse({
       contentId: "episode-galactic-odyssey-s1e2",
       type: CONTENT_TYPES.EPISODE,
       title: "Dark Side Relay",
@@ -50,10 +76,18 @@ describe("content metadata API routes", () => {
       playbackUrl: "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
       geoBlockCountries: ["IR", "SY"],
     });
-    expect(response.status).toBe(200);
-    expect(getResolvedContent).toHaveBeenCalledWith(
-      "episode-galactic-odyssey-s1e2",
-    );
+
+    expect(response).toEqual({
+      contentId: "episode-galactic-odyssey-s1e2",
+      type: CONTENT_TYPES.EPISODE,
+      title: "Dark Side Relay",
+      parentalRating: "16+",
+      genre: "Space Adventure",
+      quality: VIDEO_QUALITIES.HD,
+      isPremium: false,
+      geoBlockCountries: ["IR", "SY"],
+    });
+    expectNoPlaybackUrl(response);
   });
 
   it("returns a consistent 404 response when content is missing", async () => {

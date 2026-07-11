@@ -12,6 +12,10 @@ import { MwPlaybackController } from "./mw-playback.controller.js";
 import { createMwPlaybackRoutes } from "./mw-playback.route.js";
 import { MwPlaybackService } from "./mw-playback.service.js";
 
+function expectNoPlaybackUrl(value: unknown): void {
+  expect(JSON.stringify(value)).not.toContain("playbackUrl");
+}
+
 function createResolvedContentMetadata(
   contentId: string,
   overrides: Partial<ResolvedContentMetadata> = {},
@@ -367,10 +371,13 @@ describe("Middleware playback request headers", () => {
       },
     );
 
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+
+    expect(body).toEqual({
       errorCode: "GEO_BLOCKED",
       message: "Playback is not available in the user's country.",
     });
+    expectNoPlaybackUrl(body);
 
     expect(response.status).toBe(403);
   });
@@ -387,10 +394,13 @@ describe("Middleware playback request headers", () => {
       },
     );
 
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+
+    expect(body).toEqual({
       errorCode: "DEVICE_NOT_SUPPORTED",
       message: "Playback is not available on this device type.",
     });
+    expectNoPlaybackUrl(body);
 
     expect(response.status).toBe(403);
   });

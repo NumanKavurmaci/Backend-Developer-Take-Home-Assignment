@@ -6,7 +6,7 @@ The middleware content endpoint returns resolved metadata for one content item.
 GET /api/v1/mw/content/{contentId}
 ```
 
-The endpoint is intentionally read-only. It does not expose raw CMS rows; it returns the final values that a middleware consumer should use.
+The endpoint is intentionally read-only. It does not expose raw CMS rows or protected playback asset data; it returns only public metadata that a middleware consumer can inspect before requesting playback.
 
 ## Resolution Rules
 
@@ -24,7 +24,8 @@ The rule is applied independently to each field:
 | `genre`          | closest non-null value wins                    |
 | `quality`        | closest non-null value wins                    |
 | `isPremium`      | closest non-null value wins, including `false` |
-| `playbackUrl`    | closest non-null value wins                    |
+
+`playbackUrl` is resolved internally for the playback gatekeeper, but it is intentionally omitted from this public endpoint. Use `GET /api/v1/mw/playback/{contentId}` to receive playback details after geo and device checks pass.
 
 Geo-block countries use a separate override flag because an empty country list can be meaningful.
 
@@ -52,7 +53,6 @@ Example response:
   "genre": "Space Adventure",
   "quality": "HD",
   "isPremium": false,
-  "playbackUrl": "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
   "geoBlockCountries": ["IR", "SY"]
 }
 ```
@@ -108,4 +108,4 @@ Status:
 | Resolver   | `src/content/metadata-inheritance.ts`             |
 | Repository | `src/content/content-repository.ts`               |
 
-The route delegates to `resolveContentMetadata(...)`; inheritance should stay centralized there.
+The service delegates to `resolveContentMetadata(...)` for internal inheritance, then maps the result to a public response DTO before returning it from this endpoint.

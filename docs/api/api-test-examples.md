@@ -59,7 +59,6 @@ HTTP/1.1 200 OK
   "genre": "Space Adventure",
   "quality": "HD",
   "isPremium": false,
-  "playbackUrl": "https://cdn.saatcms.test/galactic-odyssey/s1/e2.m3u8",
   "geoBlockCountries": ["IR", "SY"]
 }
 ```

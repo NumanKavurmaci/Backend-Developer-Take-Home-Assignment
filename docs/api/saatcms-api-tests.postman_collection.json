@@ -21,7 +21,20 @@
           }
         ],
         "url": "{{baseUrl}}/api/v1/mw/content/episode-galactic-odyssey-s1e2"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"metadata response does not expose playbackUrl\", function () {",
+              "  pm.expect(pm.response.text()).to.not.include(\"playbackUrl\");",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Successful EPG creation",
@@ -123,7 +136,20 @@
           }
         ],
         "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e2"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"geo-blocked response does not expose playbackUrl\", function () {",
+              "  pm.expect(pm.response.text()).to.not.include(\"playbackUrl\");",
+              "});"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Device-blocked playback request",
@@ -148,7 +174,20 @@
           }
         ],
         "url": "{{baseUrl}}/api/v1/mw/playback/episode-galactic-odyssey-s1e3"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"device-blocked response does not expose playbackUrl\", function () {",
+              "  pm.expect(pm.response.text()).to.not.include(\"playbackUrl\");",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
