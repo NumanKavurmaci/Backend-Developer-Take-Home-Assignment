@@ -9,13 +9,14 @@ The project implements the core middleware and CMS scheduling concerns from the 
 | Area | Implemented |
 | --- | --- |
 | Runtime | TypeScript, Hono, Prisma, SQLite |
-| Health check | `GET /health` |
+| Health check | `GET /health` liveness and `GET /ready` database readiness |
 | Metadata inheritance | `Series -> Season -> Episode` resolution |
 | Content metadata API | `GET /api/v1/mw/content/{contentId}` |
 | Playback API | `GET /api/v1/mw/playback/{contentId}` with request headers |
 | CMS EPG API | `POST /api/v1/cms/channels/{channelId}/epg` |
 | EPG validation | ISO date-time parsing, UTC normalization, overlap blocking |
 | Concurrency model | Transactional per-channel schedule lock |
+| Observability | `X-Request-Id` correlation and structured request logs |
 | Tests | Domain, service, and route coverage |
 
 ## Quick Start
@@ -51,7 +52,8 @@ http://localhost:3000
 
 | Endpoint | Purpose | Details |
 | --- | --- | --- |
-| `GET /health` | Service health check | This README |
+| `GET /health` | Liveness check | This README |
+| `GET /ready` | Database readiness check | This README |
 | `GET /api/v1/mw/content/{contentId}` | Resolve inherited content metadata | [Content metadata API](docs/api/content-metadata-api.md) |
 | `POST /api/v1/cms/channels/{channelId}/epg` | Create an EPG program for a live channel | [CMS EPG program API](docs/api/cms-epg-program-api.md) |
 | `GET /api/v1/mw/playback/{contentId}` | Request playback after geo and device checks | [Middleware playback API](docs/api/mw-playback-api.md) |
@@ -70,6 +72,25 @@ curl http://localhost:3000/health
   "service": "saatcms-middleware-core"
 }
 ```
+
+## Readiness Check
+
+```bash
+curl http://localhost:3000/ready
+```
+
+```json
+{
+  "status": "ready",
+  "service": "saatcms-middleware-core"
+}
+```
+
+`GET /health` only confirms the process is alive. `GET /ready` also checks database connectivity.
+
+## Request Correlation
+
+Every response includes `X-Request-Id`. If the caller sends `X-Request-Id`, the same value is returned; otherwise the API generates one. Request logs are structured JSON with `requestId`, `method`, `path`, `status`, `durationMs`, and `errorCode` when applicable.
 
 ## Documentation
 

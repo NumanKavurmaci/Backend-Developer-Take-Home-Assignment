@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { DomainError } from "../domain/domain-error.js";
 import type { ApiErrorStatusCode } from "./api-error.js";
 import { toApiError } from "./domain-error-mapper.js";
+import { getRequestId, logRequest } from "./request-observability.js";
 
 type ApplicationError = Error & {
   errorCode?: string;
@@ -21,6 +22,8 @@ function toStatusCode(statusCode: number | undefined): ApiErrorStatusCode {
 export const errorHandler: ErrorHandler = (error, c) => {
   if (error instanceof DomainError) {
     const apiError = toApiError(error);
+    getRequestId(c);
+    logRequest(c, apiError.statusCode, apiError.errorCode);
 
     return c.json(
       {
@@ -33,11 +36,14 @@ export const errorHandler: ErrorHandler = (error, c) => {
 
   if (error instanceof HTTPException) {
     const statusCode = toStatusCode(error.status);
+    const errorCode =
+      statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "REQUEST_FAILED";
+    getRequestId(c);
+    logRequest(c, statusCode, errorCode);
 
     return c.json(
       {
-        errorCode:
-          statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "REQUEST_FAILED",
+        errorCode,
         message:
           statusCode === 500 ? "Unexpected server error." : error.message,
       },
@@ -58,14 +64,23 @@ export const errorHandler: ErrorHandler = (error, c) => {
       ? "Unexpected server error."
       : applicationError.message || "Request failed.";
 
+  getRequestId(c);
+  logRequest(c, statusCode, errorCode);
+
   return c.json({ errorCode, message }, statusCode);
 };
 
-export const notFoundHandler: NotFoundHandler = (c) =>
-  c.json(
+export const notFoundHandler: NotFoundHandler = (c) => {
+  const errorCode = "ROUTE_NOT_FOUND";
+
+  getRequestId(c);
+  logRequest(c, 404, errorCode);
+
+  return c.json(
     {
-      errorCode: "ROUTE_NOT_FOUND",
+      errorCode,
       message: "Route not found.",
     },
     404,
   );
+};
