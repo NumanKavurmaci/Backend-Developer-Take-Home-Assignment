@@ -11,6 +11,7 @@
     "start": "node dist/src/server.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "db:setup": "tsx scripts/db-setup.ts",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@types/node": "^26.1.0",
     "@types/sql.js": "^1.4.11",
+    "@vitest/coverage-v8": "^4.1.9",
     "prisma": "5.22.0",
     "sql.js": "^1.14.1",
     "tsx": "^4.22.4",

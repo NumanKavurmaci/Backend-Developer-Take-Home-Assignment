@@ -1,3 +1,4 @@
+import { HTTPException } from "hono/http-exception";
 import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { createApp } from "./app.js";
@@ -179,5 +180,20 @@ describe("Hono app scaffold", () => {
     expect(JSON.stringify(body)).not.toContain("playbackUrl");
     expect(JSON.stringify(body)).not.toContain("secret.m3u8");
     expect(response.status).toBe(500);
+  });
+
+  it("returns a consistent JSON response for HTTP exceptions", async () => {
+    const app = createApp();
+    app.get("/teapot", () => {
+      throw new HTTPException(418, { message: "Short and stout" });
+    });
+
+    const response = await app.request("/teapot");
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "REQUEST_FAILED",
+      message: "Short and stout",
+    });
+    expect(response.status).toBe(418);
   });
 });

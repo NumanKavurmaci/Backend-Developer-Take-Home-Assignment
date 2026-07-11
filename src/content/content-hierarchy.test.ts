@@ -19,6 +19,7 @@ import {
 } from "./content-metadata.js";
 import {
   createContent,
+  contentSelectForHierarchy,
   getContentAncestorPath,
   getContentWithChildren,
   getContentWithParent,
@@ -431,6 +432,15 @@ describe("inheritable metadata fields", () => {
 });
 
 describe("content hierarchy queries", () => {
+  it("defines the minimal content projection needed for hierarchy checks", () => {
+    expect(contentSelectForHierarchy()).toEqual({
+      id: true,
+      type: true,
+      title: true,
+      parentId: true,
+    });
+  });
+
   it("queries direct children in stable type/title order", async () => {
     await createSeries();
     await createSeason("season-b", "series-test");
@@ -1036,6 +1046,29 @@ describe("metadata inheritance test cases", () => {
       resolveContentMetadata(prisma, "step-nine-invalid-episode"),
     ).rejects.toThrow(
       "EPISODE content must belong to a SEASON, but parent step-nine-series is SERIES.",
+    );
+  });
+
+  it("rejects incomplete raw hierarchy data before resolving metadata", async () => {
+    await prisma.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
+
+    try {
+      await prisma.content.create({
+        data: {
+          id: "orphan-season",
+          type: CONTENT_TYPES.SEASON,
+          title: "Orphan Season",
+          parentId: "missing-series",
+        },
+      });
+    } finally {
+      await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+    }
+
+    await expect(
+      resolveContentMetadata(prisma, "orphan-season"),
+    ).rejects.toThrow(
+      "Content hierarchy is incomplete for orphan-season; missing parent missing-series.",
     );
   });
 });

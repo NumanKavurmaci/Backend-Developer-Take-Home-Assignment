@@ -113,8 +113,8 @@ function hasValidDateTimeParts(match: RegExpExecArray): boolean {
   const hour = Number(match[4]);
   const minute = Number(match[5]);
   const second = Number(match[6]);
-  const offsetHour = match[9] ? Number(match[9]) : 0;
-  const offsetMinute = match[10] ? Number(match[10]) : 0;
+  const offsetHour = match[10] ? Number(match[10]) : 0;
+  const offsetMinute = match[11] ? Number(match[11]) : 0;
 
   if (
     hour > 23 ||

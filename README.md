@@ -47,6 +47,7 @@ http://localhost:3000
 | `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
 | `npm run typecheck` | Run TypeScript checks |
 | `npm test` | Run the automated test suite against a disposable test database |
+| `npm run test:coverage` | Run the automated test suite with the 90% line coverage gate |
 
 ## API Surface
 
@@ -132,10 +133,13 @@ prisma/                         Prisma schema, migrations, and seed data
 npm run typecheck
 npm run db:test
 npm test
+npm run test:coverage
 ```
 
 The tests use `.env.test` and create a disposable SQLite database at `data/test.db`. The suite recreates that database before tests and removes it afterward. Destructive test cleanup has a safety guard and refuses to run against the development database at `data/dev.db`.
 
+Coverage includes application source under `src` and excludes tests, test helpers, docs-only checks, generated/build output, and CLI entrypoints that start long-running processes. The global line coverage threshold is 90%.
+
 ## CI Quality Gate
 
-GitHub Actions runs the CI workflow on `push` and `pull_request`. The workflow installs dependencies with `npm ci`, generates the Prisma client, verifies the disposable test database with `npm run db:test`, runs `npm run typecheck`, runs `npm test`, and finishes with `npm run build`.
+GitHub Actions runs the CI workflow on `push` and `pull_request`. The workflow installs dependencies with `npm ci`, generates the Prisma client, verifies the disposable test database with `npm run db:test`, runs `npm run typecheck`, runs `npm test`, enforces coverage with `npm run test:coverage`, and finishes with `npm run build`.
