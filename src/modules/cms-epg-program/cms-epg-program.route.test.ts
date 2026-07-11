@@ -1,14 +1,17 @@
 import { Hono } from "hono";
-import { describe, expect, it, vi } from "vitest";
+import { PrismaClient } from "@prisma/client";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearLiveChannelTables } from "../../test/test-database.js";
+import { createLiveChannel } from "../../live-channel/live-channel-repository.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
 import { CmsEpgProgramController } from "./cms-epg-program.controller.js";
 import { createCmsEpgProgramRoutes } from "./cms-epg-program.route.js";
-import type { CmsEpgProgramService } from "./cms-epg-program.service.js";
+import { CmsEpgProgramService } from "./cms-epg-program.service.js";
 
-function createTestApp(
-  service: Pick<CmsEpgProgramService, "createProgram">,
-) {
+const prisma = new PrismaClient();
+
+function createTestApp(service: Pick<CmsEpgProgramService, "createProgram">) {
   const app = new Hono();
 
   app.onError(errorHandler);
@@ -22,6 +25,14 @@ function createTestApp(
 
   return app;
 }
+
+beforeEach(async () => {
+  await clearLiveChannelTables(prisma);
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
 
 describe("CMS EPG program API routes", () => {
   it("creates an EPG program for the requested channel", async () => {
@@ -143,6 +154,36 @@ describe("CMS EPG program API routes", () => {
       errorCode: "INVALID_TIME_RANGE",
       message: "EPG program startTime must be before endTime.",
     });
+    expect(response.status).toBe(400);
+  });
+
+  it("returns a client error before persistence when the real request time range is invalid", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-saat-news",
+      name: "Saat News",
+      slug: "saat-news",
+    });
+
+    const response = await createTestApp(new CmsEpgProgramService()).request(
+      "/api/v1/cms/channels/channel-saat-news/epg",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          programName: "Invalid Range",
+          startTime: "2026-07-02T19:00:00Z",
+          endTime: "2026-07-02T18:00:00Z",
+        }),
+      },
+    );
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "INVALID_TIME_RANGE",
+      message: "EPG program startTime must be before endTime.",
+    });
+    await expect(prisma.epgProgram.count()).resolves.toBe(0);
     expect(response.status).toBe(400);
   });
 

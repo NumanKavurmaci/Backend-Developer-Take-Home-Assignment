@@ -17,7 +17,7 @@
     "db:migrate": "tsx scripts/db-setup.ts",
     "db:migrate:prisma": "prisma migrate dev",
     "db:reset": "tsx scripts/db-setup.ts --reset",
-    "db:test": "vitest run src/test/test-database.test.ts src/content/content-hierarchy.test.ts src/live-channel/live-channel.test.ts",
+    "db:test": "vitest run src/test/test-database.test.ts src/db/database-constraints.test.ts src/content/content-hierarchy.test.ts src/live-channel/live-channel.test.ts",
     "db:studio": "prisma studio",
     "db:check": "tsx src/db/check.ts"
   },

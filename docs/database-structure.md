@@ -139,7 +139,7 @@ Allowed `quality` values:
 - `HD`
 - `UHD_4K`
 
-SQLite stores `type` and `quality` as strings. The application code validates the allowed values before saving data.
+SQLite stores `type` and `quality` as strings. The application code validates the allowed values before saving data, and the database also has `CHECK` constraints so unsupported values are rejected if another script bypasses the domain layer.
 
 The assignment calls this field `premium`; the code stores it as `isPremium` so the boolean meaning is clear.
 
@@ -244,6 +244,8 @@ Invalid ranges must be rejected:
 startTime >= endTime
 ```
 
+The application validates this before persistence, and the database also enforces `startTime < endTime` with a `CHECK` constraint.
+
 Overlap is checked with this rule:
 
 ```text
@@ -263,9 +265,9 @@ Indexes on `channelId`, `startTime`, and `endTime` make the overlap check fast f
 
 Stores one lock row per live channel.
 
-This table is used later when creating EPG programs safely under concurrent requests.
+This table is used when creating EPG programs safely under concurrent requests.
 
-The intended flow:
+The write flow:
 
 1. Start a transaction.
 2. Update the channel's lock row.

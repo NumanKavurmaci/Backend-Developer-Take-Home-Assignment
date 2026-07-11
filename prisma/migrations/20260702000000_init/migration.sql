@@ -12,6 +12,8 @@ CREATE TABLE "Content" (
     "geoBlockCountriesOverride" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Content_type_check" CHECK ("type" IN ('SERIES', 'SEASON', 'EPISODE', 'MOVIE')),
+    CONSTRAINT "Content_quality_check" CHECK ("quality" IS NULL OR "quality" IN ('SD', 'HD', 'UHD_4K')),
     CONSTRAINT "Content_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "Content" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
@@ -42,6 +44,7 @@ CREATE TABLE "EpgProgram" (
     "endTime" DATETIME NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "EpgProgram_time_range_check" CHECK ("startTime" < "endTime"),
     CONSTRAINT "EpgProgram_channelId_fkey" FOREIGN KEY ("channelId") REFERENCES "LiveChannel" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
