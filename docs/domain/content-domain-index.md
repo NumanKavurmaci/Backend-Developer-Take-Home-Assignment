@@ -887,7 +887,7 @@ This distinction is needed for cases where an episode intentionally clears a ser
 
 # End-to-End Flow for `GET /api/v1/mw/content/{contentId}`
 
-The future Hono route should call the existing domain function instead of reimplementing inheritance.
+The Hono middleware content route calls the existing domain function instead of reimplementing inheritance.
 
 Expected service call:
 
@@ -908,12 +908,13 @@ HTTP request
   -> metadata-inheritance.ts validates hierarchy
   -> metadata-inheritance.ts loads geo-block countries in one query
   -> metadata-inheritance.ts resolves final metadata
-  -> Controller returns JSON
+  -> Service maps internal metadata to a public response DTO
+  -> Controller returns JSON without protected playback asset data
 ```
 
-## Expected Success Response Shape
+## Success Response Shapes
 
-Current domain output shape from `ResolvedContentMetadata`:
+Internal domain output shape from `ResolvedContentMetadata`:
 
 ```json
 {
@@ -925,6 +926,21 @@ Current domain output shape from `ResolvedContentMetadata`:
   "quality": "HD",
   "isPremium": false,
   "playbackUrl": "https://cdn.example.com/example.m3u8",
+  "geoBlockCountries": ["IR", "SY"]
+}
+```
+
+Public `GET /api/v1/mw/content/{contentId}` responses intentionally omit `playbackUrl`:
+
+```json
+{
+  "contentId": "episode-galactic-odyssey-s1e1",
+  "type": "EPISODE",
+  "title": "Episode title",
+  "parentalRating": "13+",
+  "genre": "Sci-Fi Adventure",
+  "quality": "HD",
+  "isPremium": false,
   "geoBlockCountries": ["IR", "SY"]
 }
 ```
@@ -968,7 +984,7 @@ The current `src/content/` folder is a domain layer.
 
 It should not depend on Hono `Context` or HTTP request/response objects.
 
-The future HTTP module should live separately, for example:
+The HTTP module lives separately from the domain layer:
 
 ```text
 src/modules/mw-content/

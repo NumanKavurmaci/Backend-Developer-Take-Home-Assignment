@@ -175,7 +175,7 @@ Keep the repository documentation consistent with the implemented code and use `
 - Root-level `project/` directory is removed.
 - Assignment PDF lives under `docs/project`.
 - README links to the assignment notes, assignment PDF, technical recommendations, original project steps, and post-release fixes.
-- `TODOs.md` no longer contradicts implemented behavior.
+- Stale standalone TODO documentation is removed or archived.
 - Domain docs describe the current EPG concurrency implementation accurately.
 - Historical implementation notes are archived or clearly labeled if kept.
 

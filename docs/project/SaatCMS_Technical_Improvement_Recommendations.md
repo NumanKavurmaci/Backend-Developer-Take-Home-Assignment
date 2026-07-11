@@ -6,6 +6,8 @@
 **Review scope:** Architecture, domain logic, data integrity, concurrency, testing, documentation, and deployment readiness  
 **Date:** 11 July 2026
 
+**Status note:** This document records the technical review findings as originally identified. Current implementation progress is tracked in [post-release-fixes.md](post-release-fixes.md), and the README plus domain/API docs are the current source of truth.
+
 ---
 
 ## 1. Executive Summary
@@ -27,7 +29,7 @@ The second major improvement area is concurrency assurance. The existing transac
 | R3  | High     | Data Integrity   | Important rules are mainly enforced in application code.                                           | Add database constraints for invalid time ranges and unsupported values.                                      |
 | R4  | High     | Testing          | Tests use and clear the configured SQLite database.                                                | Use a dedicated disposable test database.                                                                     |
 | R5  | Medium   | CI               | No automated repository workflow proves that type checking, tests, and builds pass.                | Add a GitHub Actions quality gate.                                                                            |
-| R6  | Medium   | Documentation    | Some documentation no longer matches the implemented code.                                         | Update stale status notes and TODO entries.                                                                   |
+| R6  | Medium   | Documentation    | Some documentation no longer matches the implemented code.                                         | Update stale status notes and remove stale TODO entries.                                                      |
 | R7  | Medium   | Input Validation | Header normalization and validation could be more explicit.                                        | Validate country codes and define device-type casing behavior.                                                |
 | R8  | Medium   | Observability    | The project has limited request correlation and operational diagnostics.                           | Add structured logging, request IDs, and readiness checks.                                                    |
 | R9  | Medium   | Deployment       | SQLite on ephemeral hosting may lose data and limits write scalability.                            | Use PostgreSQL or persistent storage for shared environments.                                                 |
@@ -268,12 +270,12 @@ The documentation is detailed and reviewer-friendly, but some status information
 Examples of likely drift:
 
 - Concurrency-safe EPG creation is implemented but may still be described as a future step.
-- The TODO file mentions missing concurrency tests even though concurrency tests exist.
+- Earlier TODO entries became stale after concurrency coverage and documentation were added; the standalone TODO file has since been removed.
 
 Recommended action:
 
 - Update `docs/domain/live-channel-domain-index.md`.
-- Update or remove stale entries in `TODOs.md`.
+- Remove stale standalone TODO entries.
 - Keep `README.md` as the concise project entry point.
 - Move historical implementation notes into an archive if they are still useful.
 - Add documentation review to the final pull request checklist.
@@ -450,7 +452,6 @@ Keep migrations repeatable and avoid depending on local mutable files in deploye
 
 ```text
 README.md
-TODOs.md
 prisma/schema.prisma
 prisma/seed.ts
 

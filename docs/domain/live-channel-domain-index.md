@@ -45,7 +45,7 @@ LiveChannel
 
 ## EPG Program Subdomain
 
-EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for overlap validation and future concurrency protection.
+EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for overlap validation and concurrency protection.
 
 ### `epg-program-types.ts`
 

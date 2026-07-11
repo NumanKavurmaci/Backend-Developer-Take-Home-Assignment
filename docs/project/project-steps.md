@@ -1,5 +1,7 @@
 # SaatCMS Assignment - User Story Project Plan
 
+Historical note: this document records the original implementation plan and step-by-step delivery notes for the assignment. For current post-release work, see [post-release-fixes.md](post-release-fixes.md). For the current repository status, use the README and domain/API docs as the source of truth.
+
 Source: SaatCMS Backend Developer Take-Home Assignment.
 
 ---
@@ -355,7 +357,7 @@ newStart < existingEnd AND newEnd > existingStart
 
 ### Implementation Status
 
-Implemented in `src/live-channel/epg-program/` and enforced before EPG persistence. Concurrency-safe scheduling remains a separate later step.
+Implemented in `src/live-channel/epg-program/` and enforced before EPG persistence. Concurrency-safe scheduling is implemented by the later EPG concurrency steps using the transactional per-channel schedule-lock row.
 
 ---
 
@@ -525,7 +527,7 @@ GET /api/v1/mw/playback/{contentId}
 
 ### Implementation Status
 
-Implemented in `src/modules/mw-playback/`. The endpoint now reads the required playback headers, resolves content metadata through the inheritance engine, returns `404 Not Found` for missing content, and includes the resolved `playbackUrl` in the successful response. Geofencing and device entitlement checks are implemented in later playback steps.
+Implemented in `src/modules/mw-playback/`. The endpoint reads the required playback headers, resolves content metadata through the inheritance engine, returns `404 Not Found` for missing content, and includes the resolved `playbackUrl` only in successful playback responses after geofencing and device entitlement checks pass.
 
 ---
 
