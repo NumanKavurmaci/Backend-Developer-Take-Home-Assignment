@@ -83,6 +83,8 @@ The decision document should also define whether existing SQLite records need to
 
 # PG-02 - Provide Local PostgreSQL Environment
 
+**Status:** Implemented — the end-to-end Prisma migration smoke test completes with PG-03.
+
 ## Description
 
 Add a repeatable local PostgreSQL environment, preferably through Docker Compose.

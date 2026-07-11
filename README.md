@@ -8,7 +8,7 @@ The project implements the core middleware and CMS scheduling concerns from the 
 
 | Area | Implemented |
 | --- | --- |
-| Runtime | TypeScript, Hono, Prisma, SQLite |
+| Runtime | TypeScript, Hono, Prisma; PostgreSQL 18 migration in progress |
 | Health check | `GET /health` liveness and `GET /ready` database readiness |
 | Metadata inheritance | `Series -> Season -> Episode` resolution |
 | Content metadata API | `GET /api/v1/mw/content/{contentId}` |
@@ -24,7 +24,8 @@ The project implements the core middleware and CMS scheduling concerns from the 
 ```bash
 npm install
 cp .env.example .env
-npm run db:reset
+npm run db:start
+npm run db:migrate:prisma
 npm run db:seed
 npm run dev
 ```
@@ -37,12 +38,51 @@ The API runs locally at:
 http://localhost:3000
 ```
 
+The PostgreSQL migration is delivered in ordered steps. PG-02 provides the
+local PostgreSQL service and configuration; the Prisma migration and seed
+commands in this quick start become executable against PostgreSQL when PG-03
+replaces the active SQLite schema and migration history.
+
+### Local PostgreSQL
+
+Docker Compose runs PostgreSQL 18 on `localhost:5432` and initializes two
+databases:
+
+- `saatcms` for local development;
+- `saatcms_test` for automated tests.
+
+The credentials in `compose.yaml`, `.env.example`, and `.env.test` are
+local/test-only values. Deployed environments must provide secrets through
+their hosting platform.
+
+Start PostgreSQL and wait for its health check:
+
+```bash
+npm run db:start
+```
+
+Stop PostgreSQL while preserving its named volume:
+
+```bash
+npm run db:stop
+```
+
+For a full local reset, stop PostgreSQL and delete the named volume. This is
+destructive and removes both local databases:
+
+```bash
+npm run db:destroy
+```
+
 ## Useful Commands
 
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Start the Hono server in watch mode |
-| `npm run db:reset` | Recreate the local SQLite database |
+| `npm run db:start` | Start PostgreSQL 18 and wait until it is healthy |
+| `npm run db:stop` | Stop local PostgreSQL and preserve its data |
+| `npm run db:destroy` | Stop PostgreSQL and delete its local named volume |
+| `npm run db:reset` | Recreate the database; remains SQLite-specific until PG-05 |
 | `npm run db:seed` | Insert repeatable sample data |
 | `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
 | `npm run typecheck` | Run TypeScript checks |

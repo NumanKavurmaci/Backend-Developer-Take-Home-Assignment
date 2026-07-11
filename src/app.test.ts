@@ -43,7 +43,7 @@ describe("Hono app scaffold", () => {
     expect(response.status).toBe(200);
   });
 
-  it("returns readiness failure when the database check fails", async () => {
+  it("returns readiness failure when PostgreSQL is unreachable", async () => {
     const app = new Hono();
     const controller = new HealthController(async () => {
       throw new Error("database connection refused");
