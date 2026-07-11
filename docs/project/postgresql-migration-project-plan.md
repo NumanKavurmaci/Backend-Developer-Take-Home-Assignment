@@ -51,6 +51,8 @@ The assignment explicitly evaluates database integrity and concurrent EPG writes
 
 # PG-01 - Define PostgreSQL Migration Contract
 
+**Status:** Complete — see [ADR-001: PostgreSQL Migration Contract](adr-001-postgresql-migration-contract.md).
+
 ## Description
 
 Document the migration boundaries before implementation.
