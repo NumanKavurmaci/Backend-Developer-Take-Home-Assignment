@@ -31,7 +31,7 @@ LiveChannel
 | ----------------- | ----------------------------------------------------------------------------------- |
 | `LiveChannel`     | Stores the channel identity, display name, and unique slug.                         |
 | `EpgProgram`      | Stores scheduled programs for exactly one channel.                                  |
-| `EpgScheduleLock` | Stores the per-channel lock row used by the future concurrency-safe EPG write flow. |
+| `EpgScheduleLock` | Stores the per-channel lock row used by the concurrency-safe EPG write flow. |
 
 ## File Responsibilities
 
@@ -41,7 +41,7 @@ LiveChannel
 | `live-channel-types.ts`      | Defines live-channel input and read model TypeScript types.                                                                  |
 | `live-channel-repository.ts` | Handles Prisma reads and writes for channels, programs, and schedule-lock lookup.                                            |
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
-| `epg-program/`               | Defines scheduled-program input validation, creation types, repository writes, invalid date checks, and invalid time-range rejection. |
+| `epg-program/`               | Defines scheduled-program input validation, creation types, repository writes, invalid date checks, invalid time-range rejection, overlap checks, and per-channel concurrency-safe creation. |
 
 ## EPG Program Subdomain
 
@@ -69,7 +69,8 @@ EPG programs are stored under `src/live-channel/epg-program/` because they are s
 
 | Export              | Purpose |
 | ------------------- | ------- |
-| `createEpgProgram`  | Validates and normalizes create input, then inserts an `EpgProgram` row through Prisma. |
+| `createEpgProgram`  | Validates and normalizes create input, checks same-channel overlap, then inserts an `EpgProgram` row through Prisma. |
+| `createEpgProgramWithConcurrencyLock` | Runs EPG creation inside a transaction after touching the channel's `EpgScheduleLock` row, serializing same-channel writes so the second writer sees the first writer's program. |
 | `assertNoOverlappingEpgProgram` | Checks for a same-channel row matching `newStart < existingEnd AND newEnd > existingStart` before writes. |
 
 The repository intentionally calls `prepareEpgProgramCreateInput(...)` even when the CMS service has already validated input. This protects the persistence boundary if another future use case calls the repository directly.
@@ -104,7 +105,7 @@ HTTP request
   -> Prisma EpgProgram insert
 ```
 
-Current step boundaries:
+Current implementation status:
 
 | Behavior | Status |
 | -------- | ------ |
@@ -114,7 +115,7 @@ Current step boundaries:
 | Invalid date strings return `400` | implemented |
 | Invalid time ranges return `400` | implemented |
 | Overlap validation | implemented |
-| Concurrency-safe creation | later step |
+| Concurrency-safe creation | implemented with a transactional per-channel schedule-lock row |
 
 ## `live-channel.ts`
 
@@ -167,7 +168,7 @@ Runs validation and returns normalized data for repository writes.
 
 Creates a channel and its related schedule-lock row in one Prisma write.
 
-The lock row is important for the future EPG creation endpoint:
+The lock row is used by the EPG creation endpoint:
 
 ```text
 transaction
@@ -176,6 +177,16 @@ transaction
   -> insert program
   -> commit
 ```
+
+## Concurrency Strategy
+
+`createEpgProgramWithConcurrencyLock(...)` protects the overlap check and insert inside one database transaction. Before checking overlaps, it updates or creates the `EpgScheduleLock` row for the target channel. Same-channel writers contend on the same lock row, so they are serialized. Once the first transaction commits, the next transaction performs the overlap query against the updated schedule and rejects conflicting ranges.
+
+The lock is channel-scoped. Requests for different channels use different lock rows, so they can proceed independently from the application's perspective.
+
+SQLite note: SQLite is acceptable for this take-home assignment and local tests, but its write locking is database-level under concurrent writes. The per-channel lock proves the application-level invariant, but SQLite may still serialize broader write traffic internally. A shared production deployment should use PostgreSQL or another durable database.
+
+PostgreSQL note: the same application flow can use row locking on the channel lock row. A production hardening pass can also add PostgreSQL exclusion constraints over `(channel_id, tstzrange(start_time, end_time, '[)'))` to enforce non-overlap at the database layer.
 
 ### `getLiveChannelById(prisma, channelId)`
 
@@ -217,5 +228,9 @@ Current tests cover:
 - EPG overlap rejection on the same channel.
 - Back-to-back EPG programs.
 - Same EPG time range on different channels.
-
-Concurrency tests are planned separately in the project plan.
+- Concurrent overlapping same-channel writes with one shared Prisma client.
+- Concurrent overlapping same-channel writes with independent Prisma clients.
+- Burst concurrency where 12 overlapping requests insert exactly one program.
+- Concurrent same-time writes on different channels with independent clients.
+- Concurrent back-to-back same-channel writes with independent clients.
+- Final database state checks proving rejected concurrent writes leave no overlapping programs.
