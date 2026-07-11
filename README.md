@@ -114,3 +114,7 @@ npm test
 ```
 
 The tests use `.env.test` and create a disposable SQLite database at `data/test.db`. The suite recreates that database before tests and removes it afterward. Destructive test cleanup has a safety guard and refuses to run against the development database at `data/dev.db`.
+
+## CI Quality Gate
+
+GitHub Actions runs the CI workflow on `push` and `pull_request`. The workflow installs dependencies with `npm ci`, generates the Prisma client, verifies the disposable test database with `npm run db:test`, runs `npm run typecheck`, runs `npm test`, and finishes with `npm run build`.
