@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearContentTables } from "../test/test-database.js";
 import {
   assertContentType,
   CONTENT_TYPE_VALUES,
@@ -30,18 +31,12 @@ import { resolveContentMetadata } from "./metadata-inheritance.js";
 const prisma = new PrismaClient();
 
 beforeEach(async () => {
-  await clearContentTables();
+  await clearContentTables(prisma);
 });
 
 afterAll(async () => {
   await prisma.$disconnect();
 });
-
-async function clearContentTables() {
-  await prisma.contentGeoBlockCountry.deleteMany();
-  await prisma.content.updateMany({ data: { parentId: null } });
-  await prisma.content.deleteMany();
-}
 
 async function createSeries(id = "series-test") {
   return createContent(prisma, {

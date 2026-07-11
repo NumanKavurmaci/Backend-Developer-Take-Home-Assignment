@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { clearLiveChannelTables } from "../test/test-database.js";
 import {
   assertValidLiveChannelInput,
   normalizeLiveChannelName,
@@ -22,18 +23,12 @@ import {
 const prisma = new PrismaClient();
 
 beforeEach(async () => {
-  await clearLiveChannelTables();
+  await clearLiveChannelTables(prisma);
 });
 
 afterAll(async () => {
   await prisma.$disconnect();
 });
-
-async function clearLiveChannelTables() {
-  await prisma.epgProgram.deleteMany();
-  await prisma.epgScheduleLock.deleteMany();
-  await prisma.liveChannel.deleteMany();
-}
 
 describe("live channel domain", () => {
   it("normalizes channel names and slugs", () => {

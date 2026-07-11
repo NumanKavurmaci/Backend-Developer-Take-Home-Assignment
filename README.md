@@ -43,8 +43,9 @@ http://localhost:3000
 | `npm run dev` | Start the Hono server in watch mode |
 | `npm run db:reset` | Recreate the local SQLite database |
 | `npm run db:seed` | Insert repeatable sample data |
+| `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
 | `npm run typecheck` | Run TypeScript checks |
-| `npm test` | Run the automated test suite |
+| `npm test` | Run the automated test suite against a disposable test database |
 
 ## API Surface
 
@@ -108,7 +109,8 @@ prisma/                         Prisma schema, migrations, and seed data
 
 ```bash
 npm run typecheck
+npm run db:test
 npm test
 ```
 
-The tests use the configured local SQLite database. If you run manual API examples after `npm test`, run `npm run db:reset` and `npm run db:seed` again first.
+The tests use `.env.test` and create a disposable SQLite database at `data/test.db`. The suite recreates that database before tests and removes it afterward. Destructive test cleanup has a safety guard and refuses to run against the development database at `data/dev.db`.
