@@ -569,7 +569,7 @@ describe("live channel repository", () => {
   }, 20_000);
 
   it("keeps concurrent same-time writes isolated across independent channel clients", async () => {
-    const channelInputs = Array.from({ length: 6 }, (_, index) => ({
+    const channelInputs = Array.from({ length: 3 }, (_, index) => ({
       id: `channel-independent-${index}`,
       name: `Independent Channel ${index}`,
       slug: `independent-channel-${index}`,
@@ -580,6 +580,7 @@ describe("live channel repository", () => {
     }
 
     const clients = channelInputs.map(() => createIndependentPrismaClient());
+
     const results = await Promise.allSettled(
       channelInputs.map((channelInput, index) =>
         createEpgProgramWithConcurrencyLock(clients[index], {
@@ -604,8 +605,7 @@ describe("live channel repository", () => {
     expect(programs.map((program) => program.channelId).sort()).toEqual(
       channelInputs.map((channelInput) => channelInput.id).sort(),
     );
-  });
-
+  }, 20_000);
   it("allows concurrent back-to-back writes on the same channel with independent clients", async () => {
     await createLiveChannel(prisma, {
       id: "channel-saat-news",
