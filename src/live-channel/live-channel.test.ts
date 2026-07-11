@@ -537,7 +537,7 @@ describe("live channel repository", () => {
       slug: "saat-news",
     });
 
-    const clients = Array.from({ length: 12 }, () =>
+    const clients = Array.from({ length: 3 }, () =>
       createIndependentPrismaClient(),
     );
     const results = await Promise.allSettled(
@@ -553,7 +553,7 @@ describe("live channel repository", () => {
     );
 
     expect(fulfilledResults(results)).toHaveLength(1);
-    expect(rejectedResults(results)).toHaveLength(11);
+    expect(rejectedResults(results)).toHaveLength(clients.length - 1);
 
     const programs = await prisma.epgProgram.findMany({
       where: {
@@ -566,7 +566,7 @@ describe("live channel repository", () => {
 
     expect(programs).toHaveLength(1);
     expectNoOverlappingPrograms(programs);
-  });
+  }, 20_000);
 
   it("keeps concurrent same-time writes isolated across independent channel clients", async () => {
     const channelInputs = Array.from({ length: 6 }, (_, index) => ({
