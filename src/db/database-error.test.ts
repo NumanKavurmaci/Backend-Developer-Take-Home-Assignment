@@ -1,80 +1,88 @@
-import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
-  isDatabaseConstraintViolation,
-  isPrismaDatabaseError,
+  isPrismaErrorCode,
+  toDatabaseConstraintFailure,
 } from "./database-error.js";
 
 describe("database error recognition", () => {
-  it("recognizes a named Prisma database constraint violation", () => {
-    const error = new Prisma.PrismaClientKnownRequestError(
-      "A constraint failed on the database.",
-      {
-        code: "P2004",
-        clientVersion: "test",
-        meta: {
-          database_error:
-            'violates exclusion constraint "EpgProgram_no_overlap_excl"',
-        },
+  it("recognizes Prisma errors structurally", () => {
+    const error = { code: "P2004" };
+
+    expect(isPrismaErrorCode(error, "P2004")).toBe(true);
+    expect(isPrismaErrorCode(error, "P2002")).toBe(false);
+  });
+
+  it.each(["P2002", "P2003", "P2024"])(
+    "does not classify %s as a database constraint failure",
+    (code) => {
+      expect(toDatabaseConstraintFailure({ code })).toBeUndefined();
+    },
+  );
+
+  it("extracts a named constraint from the error message", () => {
+    const failure = toDatabaseConstraintFailure({
+      code: "P2004",
+      message:
+        'conflicting key value violates exclusion constraint "EpgProgram_no_overlap_excl"',
+    });
+
+    expect(failure).toEqual({
+      constraintName: "EpgProgram_no_overlap_excl",
+      type: undefined,
+    });
+  });
+
+  it("extracts a named constraint from Prisma metadata", () => {
+    const failure = toDatabaseConstraintFailure({
+      code: "P2004",
+      meta: {
+        database_error:
+          'violates check constraint "EpgProgram_time_range_check"',
       },
-    );
+    });
 
-    expect(
-      isDatabaseConstraintViolation(error, "EpgProgram_no_overlap_excl"),
-    ).toBe(true);
-    expect(
-      isDatabaseConstraintViolation(error, "EpgProgram_time_range_check"),
-    ).toBe(false);
+    expect(failure?.constraintName).toBe("EpgProgram_time_range_check");
   });
 
-  it("does not classify unrelated errors as constraint violations", () => {
-    expect(
-      isDatabaseConstraintViolation(
-        new Error("EpgProgram_no_overlap_excl"),
-        "EpgProgram_no_overlap_excl",
-      ),
-    ).toBe(false);
+  it("extracts a constraint name from structured metadata", () => {
+    const failure = toDatabaseConstraintFailure({
+      code: "P2004",
+      meta: {
+        database_error: { constraint: "EpgProgram_no_overlap_excl" },
+      },
+    });
+
+    expect(failure?.constraintName).toBe("EpgProgram_no_overlap_excl");
   });
 
-  it("falls back safely when Prisma metadata cannot be serialized", () => {
+  it("extracts Prisma's normalized constraint type", () => {
+    const failure = toDatabaseConstraintFailure({
+      code: "P2004",
+      meta: { database_error: "ExclusionConstraintViolation" },
+    });
+
+    expect(failure?.type).toBe("ExclusionConstraintViolation");
+  });
+
+  it("does not invent details for an unknown P2004 error", () => {
+    expect(toDatabaseConstraintFailure({ code: "P2004" })).toEqual({
+      constraintName: undefined,
+      type: undefined,
+    });
+  });
+
+  it("handles malformed and circular metadata safely", () => {
     const circularMetadata: { self?: unknown } = {};
     circularMetadata.self = circularMetadata;
-    const error = new Prisma.PrismaClientKnownRequestError(
-      "EpgProgram_no_overlap_excl failed.",
-      {
+
+    expect(() =>
+      toDatabaseConstraintFailure({
         code: "P2004",
-        clientVersion: "test",
         meta: { database_error: circularMetadata },
-      },
-    );
-
+      }),
+    ).not.toThrow();
     expect(
-      isDatabaseConstraintViolation(error, "EpgProgram_no_overlap_excl"),
-    ).toBe(true);
-  });
-
-  it("recognizes Prisma's normalized database error for one model", () => {
-    const error = new Prisma.PrismaClientKnownRequestError(
-      "A constraint failed on the database: ExclusionConstraintViolation",
-      {
-        code: "P2004",
-        clientVersion: "test",
-        meta: {
-          modelName: "EpgProgram",
-          database_error: "ExclusionConstraintViolation",
-        },
-      },
-    );
-
-    expect(
-      isPrismaDatabaseError(
-        error,
-        "ExclusionConstraintViolation",
-        "EpgProgram",
-      ),
-    ).toBe(true);
-    expect(
-      isPrismaDatabaseError(error, "ExclusionConstraintViolation", "Content"),
-    ).toBe(false);
+      toDatabaseConstraintFailure({ code: "P2004", meta: "invalid" }),
+    ).toEqual({ constraintName: undefined, type: undefined });
   });
 });

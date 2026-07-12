@@ -1,46 +1,48 @@
-import {
-  isDatabaseConstraintViolation,
-  isPrismaDatabaseError,
-} from "../../db/database-error.js";
+import { toDatabaseConstraintFailure } from "../../db/database-error.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 
 export const EPG_TIME_RANGE_CONSTRAINT = "EpgProgram_time_range_check";
 export const EPG_NO_OVERLAP_CONSTRAINT = "EpgProgram_no_overlap_excl";
-const EPG_PROGRAM_MODEL = "EpgProgram";
 
-const EPG_ERROR_MAPPINGS = [
+type EpgErrorMapping = {
+  constraint: string;
+  prismaType?: string;
+  code: string;
+  message: string;
+};
+
+const EPG_ERROR_MAPPINGS: EpgErrorMapping[] = [
   {
     constraint: EPG_NO_OVERLAP_CONSTRAINT,
-    prismaError: "ExclusionConstraintViolation",
+    prismaType: "ExclusionConstraintViolation",
     code: "EPG_OVERLAP",
     message: "EPG program overlaps with an existing schedule on this channel.",
   },
   {
     constraint: EPG_TIME_RANGE_CONSTRAINT,
-    prismaError: "CheckConstraintViolation",
     code: "INVALID_TIME_RANGE",
     message: "EPG program startTime must be before endTime.",
   },
-] as const;
+];
 
 export function toEpgProgramDomainError(
   error: unknown,
 ): DomainError | undefined {
+  const failure = toDatabaseConstraintFailure(error);
+
+  if (!failure) {
+    return undefined;
+  }
+
   for (const mapping of EPG_ERROR_MAPPINGS) {
-    if (matchesEpgConstraint(error, mapping)) {
+    const matchesConstraint = failure.constraintName === mapping.constraint;
+    const matchesPrismaType =
+      mapping.prismaType !== undefined && failure.type === mapping.prismaType;
+
+    if (matchesConstraint || matchesPrismaType) {
       return new DomainError(mapping.code, mapping.message);
     }
   }
 
   return undefined;
-}
-
-function matchesEpgConstraint(
-  error: unknown,
-  mapping: (typeof EPG_ERROR_MAPPINGS)[number],
-): boolean {
-  return (
-    isDatabaseConstraintViolation(error, mapping.constraint) ||
-    isPrismaDatabaseError(error, mapping.prismaError, EPG_PROGRAM_MODEL)
-  );
 }

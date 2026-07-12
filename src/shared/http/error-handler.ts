@@ -1,14 +1,9 @@
 import type { ErrorHandler, NotFoundHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { DomainError } from "../domain/domain-error.js";
-import type { ApiErrorStatusCode } from "./api-error.js";
+import { ApiError, type ApiErrorStatusCode } from "./api-error.js";
 import { toApiError } from "./domain-error-mapper.js";
 import { getRequestId, logRequest } from "./request-observability.js";
-
-type ApplicationError = Error & {
-  errorCode?: string;
-  statusCode?: number;
-};
 
 function toStatusCode(statusCode: number | undefined): ApiErrorStatusCode {
   if (!statusCode || statusCode < 400 || statusCode > 599) {
@@ -34,6 +29,19 @@ export const errorHandler: ErrorHandler = (error, c) => {
     );
   }
 
+  if (error instanceof ApiError) {
+    getRequestId(c);
+    logRequest(c, error.statusCode, error.errorCode);
+
+    return c.json(
+      {
+        errorCode: error.errorCode,
+        message: error.message,
+      },
+      error.statusCode,
+    );
+  }
+
   if (error instanceof HTTPException) {
     const statusCode = toStatusCode(error.status);
     const errorCode =
@@ -51,23 +59,18 @@ export const errorHandler: ErrorHandler = (error, c) => {
     );
   }
 
-  const applicationError = error as ApplicationError;
-
-  const statusCode = toStatusCode(applicationError.statusCode);
-
-  const errorCode =
-    applicationError.errorCode ??
-    (statusCode === 500 ? "INTERNAL_SERVER_ERROR" : "REQUEST_FAILED");
-
-  const message =
-    statusCode === 500
-      ? "Unexpected server error."
-      : applicationError.message || "Request failed.";
-
+  const statusCode = 500;
+  const errorCode = "INTERNAL_SERVER_ERROR";
   getRequestId(c);
   logRequest(c, statusCode, errorCode);
 
-  return c.json({ errorCode, message }, statusCode);
+  return c.json(
+    {
+      errorCode,
+      message: "Unexpected server error.",
+    },
+    statusCode,
+  );
 };
 
 export const notFoundHandler: NotFoundHandler = (c) => {

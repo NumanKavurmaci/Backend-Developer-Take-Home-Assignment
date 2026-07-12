@@ -1,38 +1,78 @@
-import { Prisma } from "@prisma/client";
+type UnknownRecord = Record<string, unknown>;
 
-/** Identifies a named PostgreSQL constraint violation reported by Prisma. */
-export function isDatabaseConstraintViolation(
+export type DatabaseConstraintFailure = {
+  constraintName?: string;
+  type?: string;
+};
+
+const CONSTRAINT_NAME_PATTERNS = [
+  /constraint\s+["'`]([A-Za-z_][A-Za-z0-9_]*)["'`]/i,
+  /constraint:\s*(?:Some\()?["'`]([A-Za-z_][A-Za-z0-9_]*)["'`]/i,
+  /["'`]constraint["'`]\s*:\s*["'`]([A-Za-z_][A-Za-z0-9_]*)["'`]/i,
+];
+
+const DATABASE_CONSTRAINT_TYPES = [
+  "ExclusionConstraintViolation",
+  "CheckConstraintViolation",
+] as const;
+
+export function isPrismaErrorCode(error: unknown, code: string): boolean {
+  return readRecord(error)?.code === code;
+}
+
+export function toDatabaseConstraintFailure(
   error: unknown,
-  constraintName: string,
-): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== "P2004"
-  ) {
-    return false;
+): DatabaseConstraintFailure | undefined {
+  if (!isPrismaErrorCode(error, "P2004")) {
+    return undefined;
   }
 
-  const databaseError = error.meta?.database_error;
-  const details = `${error.message} ${stringifyErrorMetadata(databaseError)}`;
+  const errorRecord = readRecord(error);
+  const meta = readRecord(errorRecord?.meta);
+  const details = [
+    readString(errorRecord?.message),
+    stringifyMetadata(meta?.database_error),
+  ].join(" ");
 
-  return details.includes(constraintName);
+  return {
+    constraintName: findConstraintName(details),
+    type: findConstraintType(details),
+  };
 }
 
-/** Matches the normalized database error type Prisma exposes for a model. */
-export function isPrismaDatabaseError(
-  error: unknown,
-  databaseErrorType: string,
-  modelName: string,
-): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2004" &&
-    error.meta?.database_error === databaseErrorType &&
-    error.meta?.modelName === modelName
-  );
+function findConstraintName(details: string): string | undefined {
+  for (const pattern of CONSTRAINT_NAME_PATTERNS) {
+    const constraintName = pattern.exec(details)?.[1];
+
+    if (constraintName) {
+      return constraintName;
+    }
+  }
+
+  return undefined;
 }
 
-function stringifyErrorMetadata(metadata: unknown): string {
+function findConstraintType(details: string): string | undefined {
+  for (const constraintType of DATABASE_CONSTRAINT_TYPES) {
+    if (details.includes(constraintType)) {
+      return constraintType;
+    }
+  }
+
+  return undefined;
+}
+
+function readRecord(value: unknown): UnknownRecord | undefined {
+  return typeof value === "object" && value !== null
+    ? (value as UnknownRecord)
+    : undefined;
+}
+
+function readString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function stringifyMetadata(metadata: unknown): string {
   if (typeof metadata === "string") {
     return metadata;
   }

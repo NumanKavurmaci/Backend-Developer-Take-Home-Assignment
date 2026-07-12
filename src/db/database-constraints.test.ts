@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { toDatabaseConstraintFailure } from "./database-error.js";
 import {
   clearContentTables,
   clearLiveChannelTables,
@@ -7,6 +8,10 @@ import {
 import { CONTENT_TYPES } from "../content/content-types.js";
 import { VIDEO_QUALITIES } from "../content/content-metadata.js";
 import { createLiveChannel } from "../live-channel/live-channel-repository.js";
+import {
+  EPG_TIME_RANGE_CONSTRAINT,
+  toEpgProgramDomainError,
+} from "../live-channel/epg-program/epg-program-error-mapper.js";
 
 const prisma = new PrismaClient();
 
@@ -29,7 +34,7 @@ describe("database-level constraints", () => {
 
     const time = new Date("2026-07-02T18:00:00.000Z");
 
-    await expect(
+    const error = await captureError(
       prisma.epgProgram.create({
         data: {
           id: "epg-equal-range",
@@ -39,7 +44,22 @@ describe("database-level constraints", () => {
           endTime: time,
         },
       }),
-    ).rejects.toThrow();
+    );
+    const failure = toDatabaseConstraintFailure(error);
+
+    expect(failure).toBeDefined();
+    expect(
+      failure?.constraintName === EPG_TIME_RANGE_CONSTRAINT ||
+        failure?.type === "CheckConstraintViolation",
+    ).toBe(true);
+
+    if (failure?.constraintName === EPG_TIME_RANGE_CONSTRAINT) {
+      expect(toEpgProgramDomainError(error)).toMatchObject({
+        errorCode: "INVALID_TIME_RANGE",
+      });
+    } else {
+      expect(toEpgProgramDomainError(error)).toBeUndefined();
+    }
   });
 
   it("rejects direct EPG inserts where startTime is after endTime", async () => {
@@ -78,7 +98,7 @@ describe("database-level constraints", () => {
       },
     });
 
-    await expect(
+    const error = await captureError(
       prisma.epgProgram.create({
         data: {
           id: "epg-direct-overlap",
@@ -88,7 +108,11 @@ describe("database-level constraints", () => {
           endTime: new Date("2026-07-02T21:00:00.000Z"),
         },
       }),
-    ).rejects.toThrow();
+    );
+
+    expect(toEpgProgramDomainError(error)).toMatchObject({
+      errorCode: "EPG_OVERLAP",
+    });
     await expect(prisma.epgProgram.count()).resolves.toBe(1);
   });
 
@@ -290,3 +314,13 @@ describe("database-level constraints", () => {
     ]);
   });
 });
+
+async function captureError(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+
+  throw new Error("Expected database operation to fail.");
+}

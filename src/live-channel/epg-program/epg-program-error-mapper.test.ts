@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   EPG_NO_OVERLAP_CONSTRAINT,
@@ -10,21 +9,14 @@ describe("EPG program error mapper", () => {
   it.each([
     [EPG_NO_OVERLAP_CONSTRAINT, "EPG_OVERLAP"],
     [EPG_TIME_RANGE_CONSTRAINT, "INVALID_TIME_RANGE"],
-  ])("maps %s to %s", (constraintName, errorCode) => {
-    const error = constraintViolation(constraintName);
+  ])("maps named constraint %s to %s", (constraintName, errorCode) => {
+    const error = namedConstraintViolation(constraintName);
 
     expect(toEpgProgramDomainError(error)).toMatchObject({ errorCode });
   });
 
-  it("does not map unrelated persistence failures", () => {
-    expect(
-      toEpgProgramDomainError(new Error("connection failed")),
-    ).toBeUndefined();
-  });
-
-  it("maps Prisma's normalized exclusion violation for EpgProgram", () => {
+  it("maps Prisma's normalized exclusion violation", () => {
     const error = normalizedConstraintViolation(
-      "EpgProgram",
       "ExclusionConstraintViolation",
     );
 
@@ -33,37 +25,33 @@ describe("EPG program error mapper", () => {
     });
   });
 
-  it("does not map an exclusion violation belonging to another model", () => {
-    const error = normalizedConstraintViolation(
-      "Content",
-      "ExclusionConstraintViolation",
-    );
+  it("does not guess which check constraint failed", () => {
+    const error = normalizedConstraintViolation("CheckConstraintViolation");
 
+    expect(toEpgProgramDomainError(error)).toBeUndefined();
+  });
+
+  it.each([
+    new Error("connection failed"),
+    { code: "P2003" },
+    { code: "P2024" },
+    normalizedConstraintViolation("ForeignKeyConstraintViolation"),
+    { code: "P2004" },
+  ])("does not map unrelated persistence error %#", (error) => {
     expect(toEpgProgramDomainError(error)).toBeUndefined();
   });
 });
 
-function constraintViolation(constraintName: string) {
-  return new Prisma.PrismaClientKnownRequestError(
-    "A constraint failed on the database.",
-    {
-      code: "P2004",
-      clientVersion: "test",
-      meta: { database_error: `violates constraint "${constraintName}"` },
-    },
-  );
+function namedConstraintViolation(constraintName: string) {
+  return {
+    code: "P2004",
+    message: `violates constraint "${constraintName}"`,
+  };
 }
 
-function normalizedConstraintViolation(
-  modelName: string,
-  databaseError: string,
-) {
-  return new Prisma.PrismaClientKnownRequestError(
-    `A constraint failed on the database: ${databaseError}`,
-    {
-      code: "P2004",
-      clientVersion: "test",
-      meta: { modelName, database_error: databaseError },
-    },
-  );
+function normalizedConstraintViolation(databaseError: string) {
+  return {
+    code: "P2004",
+    meta: { database_error: databaseError },
+  };
 }
