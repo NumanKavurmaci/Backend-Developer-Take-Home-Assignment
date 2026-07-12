@@ -57,6 +57,7 @@ async function clearExistingData(transaction: Prisma.TransactionClient) {
   await transaction.epgProgram.deleteMany();
   await transaction.epgScheduleLock.deleteMany();
   await transaction.liveChannel.deleteMany();
+  await transaction.catalogSeedManifest.deleteMany();
   await transaction.contentGeoBlockCountry.deleteMany();
   await transaction.content.updateMany({ data: { parentId: null } });
   await transaction.content.deleteMany();
