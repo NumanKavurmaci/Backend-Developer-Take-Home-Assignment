@@ -17,7 +17,20 @@ export interface CatalogJsonClientOptions {
   fetch?: typeof fetch;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
+  onEvent?: (event: CatalogHttpEvent) => void;
 }
+
+export type CatalogHttpEvent =
+  | { type: "cache-hit"; provider: string; operation: string; bytes: number }
+  | { type: "cache-miss"; provider: string; operation: string }
+  | { type: "request-start"; provider: string; operation: string; attempt: number; maxAttempts: number }
+  | { type: "response-cached"; provider: string; operation: string; bytes: number }
+  | { type: "retry"; provider: string; operation: string; delayMs: number; status?: number };
+type CatalogHttpEventDetails = CatalogHttpEvent extends infer Event
+  ? Event extends CatalogHttpEvent
+    ? Omit<Event, "provider" | "operation">
+    : never
+  : never;
 
 export interface CatalogJsonRequestOptions {
   operation: string;
@@ -37,10 +50,11 @@ export class CatalogSourceError extends Error {
 }
 
 export class CachedJsonClient {
-  readonly #options: Required<Omit<CatalogJsonClientOptions, "fetch" | "now" | "sleep">>;
+  readonly #options: Required<Omit<CatalogJsonClientOptions, "fetch" | "now" | "sleep" | "onEvent">>;
   readonly #fetch: typeof fetch;
   readonly #now: () => number;
   readonly #sleep: (milliseconds: number) => Promise<void>;
+  readonly #onEvent: (event: CatalogHttpEvent) => void;
   #lastRequestStartedAt: number | null = null;
   #pacingTail: Promise<void> = Promise.resolve();
 
@@ -60,13 +74,18 @@ export class CachedJsonClient {
     this.#fetch = options.fetch ?? globalThis.fetch;
     this.#now = options.now ?? Date.now;
     this.#sleep = options.sleep ?? sleep;
+    this.#onEvent = options.onEvent ?? (() => undefined);
   }
 
   async getJson<T>(url: string, request: CatalogJsonRequestOptions): Promise<T | null> {
     const operation = safeOperation(request.operation);
     const cachePath = this.cachePath(url, operation);
     const cached = await readCachedJson<T>(cachePath, this.#options.provider, operation);
-    if (cached.found) return cached.value;
+    if (cached.found) {
+      this.#emit({ type: "cache-hit", bytes: cached.bytes }, operation);
+      return cached.value;
+    }
+    this.#emit({ type: "cache-miss" }, operation);
 
     if (this.#options.offline) {
       throw new CatalogSourceError(
@@ -78,6 +97,11 @@ export class CachedJsonClient {
 
     for (let attempt = 0; attempt < this.#options.maxAttempts; attempt += 1) {
       await this.#waitForRateLimit();
+      this.#emit({
+        type: "request-start",
+        attempt: attempt + 1,
+        maxAttempts: this.#options.maxAttempts,
+      }, operation);
       let response: Response;
       try {
         response = await this.#fetch(url, {
@@ -96,7 +120,9 @@ export class CachedJsonClient {
             operation,
           );
         }
-        await this.#sleep(retryDelayMs(null, attempt, this.#options.maxRetryDelayMs));
+        const delayMs = retryDelayMs(null, attempt, this.#options.maxRetryDelayMs);
+        this.#emit({ type: "retry", delayMs }, operation);
+        await this.#sleep(delayMs);
         continue;
       }
 
@@ -122,9 +148,11 @@ export class CachedJsonClient {
             response.status,
           );
         }
-        await this.#sleep(
-          retryDelayMs(response.headers.get("retry-after"), attempt, this.#options.maxRetryDelayMs),
+        const delayMs = retryDelayMs(
+          response.headers.get("retry-after"), attempt, this.#options.maxRetryDelayMs,
         );
+        this.#emit({ type: "retry", delayMs, status: response.status }, operation);
+        await this.#sleep(delayMs);
         continue;
       }
 
@@ -139,10 +167,25 @@ export class CachedJsonClient {
         );
       }
       await writeCachedJson(cachePath, payload);
+      this.#emit(
+        { type: "response-cached", bytes: Buffer.byteLength(JSON.stringify(payload), "utf8") },
+        operation,
+      );
       return payload;
     }
 
     throw new CatalogSourceError("request failed", this.#options.provider, operation);
+  }
+
+  #emit(
+    event: CatalogHttpEventDetails,
+    operation: string,
+  ): void {
+    this.#onEvent({
+      ...event,
+      provider: this.#options.provider,
+      operation,
+    } as CatalogHttpEvent);
   }
 
   cachePath(url: string, operation: string): string {
@@ -206,9 +249,14 @@ function canonicalizeUrl(value: string): string {
   return url.toString();
 }
 
-async function readCachedJson<T>(filePath: string, provider: string, operation: string): Promise<{ found: true; value: T | null } | { found: false }> {
+async function readCachedJson<T>(filePath: string, provider: string, operation: string): Promise<{ found: true; value: T | null; bytes: number } | { found: false }> {
   try {
-    return { found: true, value: JSON.parse(await readFile(filePath, "utf8")) as T };
+    const text = await readFile(filePath, "utf8");
+    return {
+      found: true,
+      value: JSON.parse(text) as T,
+      bytes: Buffer.byteLength(text, "utf8"),
+    };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { found: false };
     throw new CatalogSourceError("cached response is unreadable or malformed", provider, operation);

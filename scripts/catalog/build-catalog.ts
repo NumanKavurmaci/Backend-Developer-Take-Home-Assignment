@@ -4,18 +4,24 @@ import { readCatalogBuildConfig } from "./build-config.js";
 import { buildCatalogFromTvMaze } from "./catalog-builder.js";
 import { createTvMazeClient } from "./tvmaze-client.js";
 import { HttpTvMazeCatalogSource } from "./tvmaze-source.js";
+import { CatalogBuildProgressReporter } from "./build-progress.js";
 
 async function main(): Promise<void> {
   const config = readCatalogBuildConfig();
+  const progress = new CatalogBuildProgressReporter(
+    config.artifactConfiguration,
+  );
   const source = new HttpTvMazeCatalogSource(
     createTvMazeClient({
       cacheDir: config.cacheDir,
       offline: config.artifactConfiguration.offline,
+      onEvent: progress.onHttpEvent,
     }),
   );
   const built = await buildCatalogFromTvMaze(
     source,
     config.artifactConfiguration,
+    progress.onBuildEvent,
   );
   const manifest = await writeCatalogArtifact(config.outputDir, built.chunk, {
     generatedAt: new Date().toISOString(),
@@ -51,6 +57,7 @@ async function main(): Promise<void> {
           ...built.summary,
           excludedEpisodes: built.summary.excludedEpisodes.length,
         },
+        sourceProgress: progress.snapshot,
       },
       null,
       2,

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { CachedJsonClient } from "./http.js";
+import type { CatalogHttpEvent } from "./http.js";
 
 export const TVMAZE_MIN_REQUEST_INTERVAL_MS = 550;
 export const TVMAZE_USER_AGENT =
@@ -9,6 +10,7 @@ export function createTvMazeClient(options: {
   cacheDir?: string;
   offline?: boolean;
   fetch?: typeof fetch;
+  onEvent?: (event: CatalogHttpEvent) => void;
 } = {}): CachedJsonClient {
   return new CachedJsonClient({
     provider: "TVmaze",
@@ -21,5 +23,6 @@ export function createTvMazeClient(options: {
     maxRetryDelayMs: 30_000,
     offline: options.offline ?? false,
     fetch: options.fetch,
+    onEvent: options.onEvent,
   });
 }

@@ -22,10 +22,20 @@ function client(overrides: Partial<CatalogJsonClientOptions> = {}): CachedJsonCl
 describe("CachedJsonClient", () => {
   it("uses a successful cached response without a second HTTP request", async () => {
     const fetchMock = vi.fn(async () => jsonResponse({ id: 1 }));
-    const source = client({ fetch: fetchMock as unknown as typeof fetch });
+    const events: string[] = [];
+    const source = client({
+      fetch: fetchMock as unknown as typeof fetch,
+      onEvent: (event) => events.push(event.type),
+    });
     await expect(source.getJson("https://api.tvmaze.com/shows/1", { operation: "show-1" })).resolves.toEqual({ id: 1 });
     await expect(source.getJson("https://api.tvmaze.com/shows/1", { operation: "show-1" })).resolves.toEqual({ id: 1 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([
+      "cache-miss",
+      "request-start",
+      "response-cached",
+      "cache-hit",
+    ]);
   });
 
   it("serves an offline cache hit without network access", async () => {

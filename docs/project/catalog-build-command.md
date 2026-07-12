@@ -38,6 +38,15 @@ Replay only cached responses by setting `CATALOG_OFFLINE=true` or passing
 `--offline` to the underlying CLI. The output target must not already exist;
 the writer refuses replacement rather than deleting an artifact implicitly.
 
+During a build, progress is written to stderr. Source progress reports completed
+operations, cache hits, network responses, retries, cached bytes read, and new
+bytes downloaded. Catalog progress reports pages, included/skipped Shows, rows,
+and remaining configured Show/row capacity. The final budget lines show
+normalized and estimated PostgreSQL bytes against their guards and the
+remaining capacity. TVmaze does not publish a fixed total row count, so
+“remaining” means remaining configured budget; the true provider remainder is
+known only as additional index pages are examined.
+
 Validate completed output independently:
 
 ```shell

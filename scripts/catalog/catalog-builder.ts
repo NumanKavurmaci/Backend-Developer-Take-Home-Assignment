@@ -28,9 +28,24 @@ export interface CatalogBuildResult extends GeneratedCatalogPolicies {
   };
 }
 
+export type CatalogBuildProgressEvent =
+  | { type: "page"; page: number; showsDiscovered: number; pagesFetched: number }
+  | {
+      type: "show-included";
+      showId: number;
+      showRows: number;
+      showsIncluded: number;
+      totalRows: number;
+      remainingShows: number;
+      remainingRows: number;
+    }
+  | { type: "show-skipped"; showId: number; reason: string }
+  | { type: "complete"; stopReason: CatalogBuildStopReason; normalizedBytes: number; estimatedDatabaseBytes: number };
+
 export async function buildCatalogFromTvMaze(
   source: TvMazeCatalogSource,
   config: CatalogArtifactConfiguration,
+  onProgress: (event: CatalogBuildProgressEvent) => void = () => undefined,
 ): Promise<CatalogBuildResult> {
   let combined: NormalizedCatalogChunk = {
     content: [],
@@ -51,6 +66,12 @@ export async function buildCatalogFromTvMaze(
   ) {
     const shows = await source.getShowPage(page);
     pagesFetched += 1;
+    onProgress({
+      type: "page",
+      page,
+      showsDiscovered: shows?.length ?? 0,
+      pagesFetched,
+    });
     if (shows === null || shows.length === 0) {
       stopReason = "end-of-index";
       break;
@@ -65,6 +86,7 @@ export async function buildCatalogFromTvMaze(
       seenShowIds.add(show.id);
       if (!isUsableTvMazeShow(show)) {
         showsSkipped.push({ showId: show.id, reason: "INELIGIBLE_SHOW" });
+        onProgress({ type: "show-skipped", showId: show.id, reason: "INELIGIBLE_SHOW" });
         continue;
       }
 
@@ -85,6 +107,7 @@ export async function buildCatalogFromTvMaze(
       });
       if (normalized.status === "skipped") {
         showsSkipped.push({ showId: show.id, reason: normalized.reason });
+        onProgress({ type: "show-skipped", showId: show.id, reason: normalized.reason });
         continue;
       }
 
@@ -103,6 +126,15 @@ export async function buildCatalogFromTvMaze(
       combined = candidate;
       showsIncluded += 1;
       excludedEpisodes.push(...normalized.excludedEpisodes);
+      onProgress({
+        type: "show-included",
+        showId: show.id,
+        showRows: normalized.chunk.content.length,
+        showsIncluded,
+        totalRows: combined.content.length,
+        remainingShows: config.maxShows - showsIncluded,
+        remainingRows: config.maxContentRows - combined.content.length,
+      });
       if (showsIncluded >= config.maxShows) {
         stopReason = "max-shows";
         break outer;
@@ -125,6 +157,12 @@ export async function buildCatalogFromTvMaze(
     normalizedBytes,
   );
   assertEstimatedDatabaseBudget(estimatedDatabaseBytes, config);
+  onProgress({
+    type: "complete",
+    stopReason,
+    normalizedBytes,
+    estimatedDatabaseBytes,
+  });
 
   return {
     ...generated,
