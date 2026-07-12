@@ -19,7 +19,13 @@ export async function readTestDatabaseUrl(): Promise<string> {
 }
 
 export async function configureTestDatabaseUrl(): Promise<void> {
-  process.env.DATABASE_URL ??= await readTestDatabaseUrl();
+  if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = "test";
+  }
+
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = await readTestDatabaseUrl();
+  }
 }
 
 export async function recreateTestDatabase(): Promise<void> {
@@ -31,11 +37,22 @@ export async function recreateTestDatabase(): Promise<void> {
 export async function removeTestDatabase(): Promise<void> {
   const databaseUrl = await getTestDatabaseUrl();
   assertUsingTestDatabase(databaseUrl);
-  await resetTestDatabase(databaseUrl);
+
+  const { PrismaClient } = await import("@prisma/client");
+  const prisma = new PrismaClient({
+    datasources: { db: { url: databaseUrl } },
+  });
+
+  try {
+    await clearTestTables(prisma, databaseUrl);
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
 export function assertUsingTestDatabase(
   databaseUrl = process.env.DATABASE_URL,
+  nodeEnvironment = process.env.NODE_ENV,
 ): void {
   if (!databaseUrl) {
     throw new Error("DATABASE_URL must be set before running database tests.");
@@ -56,16 +73,22 @@ export function assertUsingTestDatabase(
     parsedUrl.hostname,
   );
   const isTestDatabase = parsedUrl.pathname === "/saatcms_test";
+  const isTestEnvironment = nodeEnvironment === "test";
 
-  if (!isPostgreSql || !isLocalHost || !isTestDatabase) {
+  if (
+    !isPostgreSql ||
+    !isLocalHost ||
+    !isTestDatabase ||
+    !isTestEnvironment
+  ) {
     throw new Error(
-      "Refusing to run destructive test cleanup against a non-local or non-test PostgreSQL database.",
+      "Refusing to run destructive test cleanup outside the local saatcms_test PostgreSQL database in NODE_ENV=test.",
     );
   }
 }
 
 export async function clearContentTables(prisma: PrismaClient): Promise<void> {
-  assertUsingTestDatabase();
+  await assertConnectedToTestDatabase(prisma);
 
   await prisma.contentGeoBlockCountry.deleteMany();
   await prisma.content.updateMany({ data: { parentId: null } });
@@ -75,11 +98,49 @@ export async function clearContentTables(prisma: PrismaClient): Promise<void> {
 export async function clearLiveChannelTables(
   prisma: PrismaClient,
 ): Promise<void> {
-  assertUsingTestDatabase();
+  await assertConnectedToTestDatabase(prisma);
 
   await prisma.epgProgram.deleteMany();
   await prisma.epgScheduleLock.deleteMany();
   await prisma.liveChannel.deleteMany();
+}
+
+export async function clearTestTables(
+  prisma: PrismaClient,
+  databaseUrl = process.env.DATABASE_URL,
+): Promise<void> {
+  await assertConnectedToTestDatabase(prisma, databaseUrl);
+
+  await prisma.$transaction([
+    prisma.epgProgram.deleteMany(),
+    prisma.epgScheduleLock.deleteMany(),
+    prisma.liveChannel.deleteMany(),
+    prisma.contentGeoBlockCountry.deleteMany(),
+    prisma.content.updateMany({ data: { parentId: null } }),
+    prisma.content.deleteMany(),
+  ]);
+}
+
+export async function assertConnectedToTestDatabase(
+  prisma: PrismaClient,
+  databaseUrl = process.env.DATABASE_URL,
+): Promise<void> {
+  assertUsingTestDatabase(databaseUrl);
+
+  const parsedUrl = new URL(databaseUrl!);
+  const expectedSchema = parsedUrl.searchParams.get("schema") ?? "public";
+  const [connection] = await prisma.$queryRaw<
+    Array<{ databaseName: string; schemaName: string }>
+  >`SELECT current_database() AS "databaseName", current_schema() AS "schemaName"`;
+
+  if (
+    connection?.databaseName !== "saatcms_test" ||
+    connection.schemaName !== expectedSchema
+  ) {
+    throw new Error(
+      "Refusing destructive cleanup because the connected PostgreSQL database or schema does not match the guarded test URL.",
+    );
+  }
 }
 
 async function readDatabaseUrlFromEnvFile(fileName: string): Promise<string> {

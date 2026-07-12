@@ -186,7 +186,7 @@ npm test
 npm run test:coverage
 ```
 
-The tests use `.env.test` and rebuild the dedicated `saatcms_test` PostgreSQL database from committed migrations. Destructive cleanup has a safety guard and refuses non-local hosts and any database not named `saatcms_test`.
+The tests use `.env.test` and rebuild the dedicated `saatcms_test` PostgreSQL database from committed migrations. Destructive cleanup requires `NODE_ENV=test`, refuses non-local hosts and any database not named `saatcms_test`, and verifies the live Prisma connection's database and schema before deleting data. Suite teardown clears application tables while preserving the committed migration history and disconnects its Prisma client.
 
 Coverage includes application source under `src` and excludes tests, test helpers, docs-only checks, generated/build output, and CLI entrypoints that start long-running processes. The global line coverage threshold is 90%.
 
