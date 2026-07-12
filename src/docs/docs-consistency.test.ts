@@ -107,7 +107,9 @@ describe("documentation consistency", () => {
     expect(blueprint).toContain("healthCheckPath: /ready");
     expect(blueprint).toContain("ipAllowList: []");
     expect(blueprint).toContain("fromDatabase:");
-    expect(readme).toContain("## Migration Responsibilities");
+    expect(readme).toContain(
+      "[Deployment and rollback runbook](docs/ci-cd/deployment-runbook.md)",
+    );
     expect(runbook).toContain("## Backup and Restore Rehearsal");
     expect(runbook).toContain("## Rollback");
     expect(databaseStructure).toContain("TIMESTAMPTZ(3)");
@@ -188,7 +190,7 @@ describe("documentation consistency", () => {
     expect(cmsCrudDoc).toContain("CONTENT_HAS_CHILDREN");
     expect(cmsCrudDoc).toContain("LIVE_CHANNEL_WRITE_CONFLICT");
     expect(cmsCrudDoc).toContain("EPG_WRITE_CONFLICT");
-    expect(readme).toContain("CMS Authentication and Write Safety");
+    expect(readme).toContain("[CMS CRUD API](docs/api/cms-crud-api.md)");
     expect(collection).toContain("Bearer {{cmsEditorKey}}");
     expect(collection).toContain("Bearer {{cmsAdminKey}}");
   });
