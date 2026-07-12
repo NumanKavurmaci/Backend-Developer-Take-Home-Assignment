@@ -28,7 +28,7 @@ describe("PostgreSQL database tooling", () => {
       "db:migrate": "prisma migrate dev",
       "db:migrate:deploy": "prisma migrate deploy",
       "db:reset": "prisma migrate reset",
-      "db:seed": "tsx prisma/seed.ts",
+      "db:seed": "tsx prisma/seed.ts --demo",
       "db:check": "tsx src/db/check.ts",
     });
     expect(packageJson.dependencies).not.toHaveProperty("sql.js");

@@ -72,6 +72,29 @@ describe("documentation consistency", () => {
     expect(metadataExampleSection).not.toContain("playbackUrl");
   });
 
+  it("keeps the managed PostgreSQL deployment safety controls documented", async () => {
+    const [blueprint, readme, runbook, databaseStructure] = await Promise.all([
+      readFile(path.join(rootDir, "render.yaml"), "utf8"),
+      readFile(path.join(rootDir, "README.md"), "utf8"),
+      readFile(
+        path.join(rootDir, "docs", "deployment-runbook.md"),
+        "utf8",
+      ),
+      readFile(path.join(rootDir, "docs", "database-structure.md"), "utf8"),
+    ]);
+
+    expect(blueprint).toContain('postgresMajorVersion: "18"');
+    expect(blueprint).toContain("preDeployCommand: npm run db:migrate:deploy");
+    expect(blueprint).toContain("healthCheckPath: /ready");
+    expect(blueprint).toContain("ipAllowList: []");
+    expect(blueprint).toContain("fromDatabase:");
+    expect(readme).toContain("## Migration Responsibilities");
+    expect(runbook).toContain("## Backup and Restore Rehearsal");
+    expect(runbook).toContain("## Rollback");
+    expect(databaseStructure).toContain("TIMESTAMPTZ(3)");
+    expect(databaseStructure).toContain("EpgProgram_no_overlap_excl");
+  });
+
   it("keeps the Postman collection aligned with current success and failure examples", async () => {
     const collection = JSON.parse(
       await readFile(

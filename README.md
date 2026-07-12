@@ -15,7 +15,7 @@ The project implements the core middleware and CMS scheduling concerns from the 
 | Playback API | `GET /api/v1/mw/playback/{contentId}` with request headers |
 | CMS EPG API | `POST /api/v1/cms/channels/{channelId}/epg` |
 | EPG validation | ISO date-time parsing, UTC normalization, overlap blocking |
-| Concurrency model | Transactional per-channel schedule lock |
+| Concurrency model | Per-channel lock row plus PostgreSQL exclusion constraint |
 | Observability | `X-Request-Id` correlation and structured request logs |
 | Tests | Domain, service, and route coverage |
 
@@ -82,9 +82,11 @@ npm run db:destroy
 | `npm run db:setup` | Generate Prisma Client and run development migrations |
 | `npm run db:migrate` | Create/apply migrations locally with `prisma migrate dev` |
 | `npm run db:migrate:deploy` | Apply committed migrations in CI or production without seeding |
-| `npm run db:reset` | **Destructively** reset and reseed a local/test database; never use in production |
-| `npm run db:seed` | Insert repeatable sample data |
+| `npm run db:reset` | **Destructively** reset a local/test database; never use in production |
+| `npm run db:seed` | Explicitly replace local/demo data with the repeatable sample dataset |
+| `npm run db:seed:verify` | Verify the expected demo records exist |
 | `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
+| `npm run deploy:smoke` | Run deployed API and HTTP concurrency checks using `DEPLOYMENT_URL` |
 | `npm run typecheck` | Run TypeScript checks |
 | `npm test` | Run the automated test suite against a disposable test database |
 | `npm run test:coverage` | Run the automated test suite with the 90% line coverage gate |
@@ -95,9 +97,50 @@ or running the seed script. Application startup never migrates, resets, or
 seeds the database automatically.
 
 `db:reset` is destructive and is restricted to local development or the
-disposable test database. Prisma runs the configured seed script after a
-successful reset. Sample data for a local or demo environment is created only
-through a separate, explicit `db:seed` operation.
+disposable test database. It does not seed automatically. Sample data is
+created only through a separate `db:seed` operation, and the seed refuses to
+run when `DEPLOYMENT_ENV=production`.
+
+## Shared Demo Deployment
+
+[`render.yaml`](render.yaml) defines the shared demo as a Render web service
+and a paid managed PostgreSQL 18 database. The database has no public IP allow
+list, and Render injects its private connection string into `DATABASE_URL`
+without storing credentials in Git. Paid Render PostgreSQL includes
+point-in-time recovery; confirm it is active before cutover.
+
+The deployment sequence is intentionally separate from application startup:
+
+1. Build the application and generate Prisma Client.
+2. Run `npm run db:migrate:deploy` as the pre-deploy command.
+3. Start the application only after migrations succeed.
+4. Route traffic only after `GET /ready` can query PostgreSQL.
+
+Migrations never seed data. For the demo environment, open a one-off service
+shell and explicitly run:
+
+```bash
+npm run db:seed
+npm run db:seed:verify
+```
+
+Then verify the deployed service from a clean checkout:
+
+```bash
+npm ci
+DEPLOYMENT_URL=https://your-service.example.com npm run deploy:smoke
+```
+
+PowerShell equivalent:
+
+```powershell
+npm ci
+$env:DEPLOYMENT_URL="https://your-service.example.com"
+npm run deploy:smoke
+```
+
+Provisioning, rehearsal, backup/restore, cutover, and rollback instructions are
+in the [deployment runbook](docs/deployment-runbook.md).
 
 ## API Surface
 
@@ -153,6 +196,7 @@ Every response includes `X-Request-Id`. If the caller sends `X-Request-Id`, the 
 | CMS EPG program API | [docs/api/cms-epg-program-api.md](docs/api/cms-epg-program-api.md) |
 | Middleware playback API | [docs/api/mw-playback-api.md](docs/api/mw-playback-api.md) |
 | Database structure | [docs/database-structure.md](docs/database-structure.md) |
+| Deployment and rollback runbook | [docs/deployment-runbook.md](docs/deployment-runbook.md) |
 | Content domain | [docs/domain/content-domain-index.md](docs/domain/content-domain-index.md) |
 | Live channel domain | [docs/domain/live-channel-domain-index.md](docs/domain/live-channel-domain-index.md) |
 | Assignment notes | [docs/project/assignment.md](docs/project/assignment.md) |
@@ -190,6 +234,24 @@ The tests use `.env.test` and rebuild the dedicated `saatcms_test` PostgreSQL da
 
 Coverage includes application source under `src` and excludes tests, test helpers, docs-only checks, generated/build output, and CLI entrypoints that start long-running processes. The global line coverage threshold is 90%.
 
+## Migration Responsibilities
+
+| Environment | Migration owner | Seeding |
+| --- | --- | --- |
+| Local development | Developer runs `npm run db:migrate` | Explicit `npm run db:seed` |
+| Automated tests | Test setup rebuilds the guarded `saatcms_test` database | Test fixtures only |
+| CI | GitHub Actions runs `npm run db:migrate:deploy` before the quality gate | Never |
+| Shared deployment | Render runs `npm run db:migrate:deploy` in the pre-deploy phase | Explicit demo-only command |
+| Application startup | Never migrates or resets the database | Never |
+
+Migration, build, test, or readiness failures block deployment. The previous
+application remains active because migrations run before the new release is
+routed traffic.
+
 ## CI Quality Gate
 
-GitHub Actions runs the CI workflow on `push` and `pull_request`. The workflow installs dependencies with `npm ci`, generates the Prisma client, verifies the disposable test database with `npm run db:test`, runs `npm run typecheck`, runs `npm test`, enforces coverage with `npm run test:coverage`, and finishes with `npm run build`.
+GitHub Actions runs on every push and pull request. It starts PostgreSQL,
+generates Prisma Client, deploys committed migrations, proves the active
+PostgreSQL connection, runs database constraint and concurrency tests,
+typechecks, runs the complete test and coverage gates, and builds production
+output.

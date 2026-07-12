@@ -1,5 +1,21 @@
 import { prisma } from "../src/db/client.js";
 
+const ALLOWED_DEMO_SEED_ENVIRONMENTS = new Set(["local", "demo", "test"]);
+
+function assertDemoSeedWasExplicitlyRequested(): void {
+  const deploymentEnvironment = process.env.DEPLOYMENT_ENV ?? "local";
+  const explicitlyRequested = process.argv.includes("--demo");
+
+  if (
+    !explicitlyRequested ||
+    !ALLOWED_DEMO_SEED_ENVIRONMENTS.has(deploymentEnvironment)
+  ) {
+    throw new Error(
+      "Demo seed refused. Run npm run db:seed only with DEPLOYMENT_ENV=local, demo, or test. Production seeding is disabled.",
+    );
+  }
+}
+
 const contentIds = {
   series: "series-galactic-odyssey",
   season: "season-galactic-odyssey-s1",
@@ -188,6 +204,7 @@ async function seedLiveChannels() {
 }
 
 async function main() {
+  assertDemoSeedWasExplicitlyRequested();
   await clearExistingData();
   await seedContent();
   await seedLiveChannels();

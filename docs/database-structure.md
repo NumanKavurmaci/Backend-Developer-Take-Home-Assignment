@@ -34,6 +34,19 @@ The database has two main areas:
 | Content metadata | `Content`, `ContentGeoBlockCountry`            | Stores the content tree and inherited playback metadata.                       |
 | Live scheduling  | `LiveChannel`, `EpgProgram`, `EpgScheduleLock` | Stores channels, schedules, and the per-channel lock used for safe EPG writes. |
 
+## PostgreSQL Column Types
+
+| Prisma field                                     | PostgreSQL representation | Why                                                |
+| ------------------------------------------------ | ------------------------- | -------------------------------------------------- |
+| IDs, names, slugs, and URLs                      | `TEXT`                    | Variable-length identifiers and text values        |
+| `isPremium`, `geoBlockCountriesOverride`         | `BOOLEAN`                 | Native true/false values                           |
+| `version`                                        | `INTEGER`                 | Lock-row update counter                            |
+| `createdAt`, `updatedAt`, `startTime`, `endTime` | `TIMESTAMPTZ(3)`          | Millisecond timestamps stored as absolute instants |
+
+Primary keys, composite keys, indexes, foreign keys, and checks are created by
+the committed Prisma SQL migrations. Parent content uses `ON DELETE RESTRICT`;
+geo-block rows, EPG programs, and schedule-lock rows use `ON DELETE CASCADE`.
+
 ## Relationships
 
 | From                               | To               | Relationship                                    |
@@ -154,10 +167,10 @@ This rule is applied independently to each field. For example, an Episode can us
 
 Geo-block countries use the same closest-owner idea, but through the explicit `geoBlockCountriesOverride` flag:
 
-| Flag    | Meaning                                                              |
-| ------- | -------------------------------------------------------------------- |
-| `false` | keep looking at the parent                                           |
-| `true`  | use this content item's country rows, even when the list is empty    |
+| Flag    | Meaning                                                           |
+| ------- | ----------------------------------------------------------------- |
+| `false` | keep looking at the parent                                        |
+| `true`  | use this content item's country rows, even when the list is empty |
 
 The inheritance service validates the loaded hierarchy before resolving metadata. Corrupted data, such as an Episode directly under a Series, is rejected instead of producing a misleading result.
 
@@ -236,7 +249,8 @@ Two simple rules define a valid schedule:
 Back-to-back programs such as `10:00–11:00` and `11:00–12:00` are valid. The
 same time range is also valid on different channels.
 
-When the API creates a program, it uses this transaction:
+The first concurrency layer is the application transaction. When the API
+creates a program, it uses this sequence:
 
 1. Update the target channel's lock row.
 2. Check for an overlapping program on that channel.
@@ -246,17 +260,24 @@ When the API creates a program, it uses this transaction:
 Requests for the same channel update the same lock row and therefore run one
 after another. Requests for different channels use different lock rows.
 
-PostgreSQL is the final safety net if application validation is bypassed:
+The second concurrency layer is PostgreSQL itself. It is the final safety net
+if application validation is bypassed or independent application instances
+race:
 
-| Constraint | Protection | API result |
-| ---------- | ---------- | ---------- |
-| `EpgProgram_time_range_check` | Rejects `startTime >= endTime`. | `400 INVALID_TIME_RANGE` |
-| `EpgProgram_no_overlap_excl` | Rejects overlapping time ranges on the same channel. | `400 EPG_OVERLAP` |
+| Constraint                    | Protection                                           | API result               |
+| ----------------------------- | ---------------------------------------------------- | ------------------------ |
+| `EpgProgram_time_range_check` | Rejects `startTime >= endTime`.                      | `400 INVALID_TIME_RANGE` |
+| `EpgProgram_no_overlap_excl`  | Rejects overlapping time ranges on the same channel. | `400 EPG_OVERLAP`        |
 
 The overlap constraint treats the end time as outside the program's range,
 which is why a program may begin exactly when the previous one ends. The
 `btree_gist` PostgreSQL extension allows the constraint to consider both the
 channel ID and time range.
+
+The lock row gives friendly, channel-scoped serialization during normal API
+writes. The exclusion constraint independently guarantees that overlapping
+rows cannot commit, including writes from another process or direct SQL. Both
+layers are required.
 
 Indexes on `channelId`, `startTime`, and `endTime` make the overlap check fast for one channel.
 
@@ -302,6 +323,21 @@ Open Prisma Studio:
 ```bash
 npm run db:studio
 ```
+
+## Migration Ownership
+
+- Developers use `prisma migrate dev` only to create migrations locally.
+- CI applies every committed migration to a fresh PostgreSQL database with
+  `prisma migrate deploy` before running tests.
+- The deployment platform runs `prisma migrate deploy` as a pre-deploy step.
+  A migration failure blocks the new release.
+- The server process only starts the application. It never migrates, resets,
+  seeds, or relies on a database file.
+- Demo seed data is loaded only by the separate guarded `npm run db:seed`
+  command. Production seeding is refused.
+
+Operational cutover, backup/restore, and rollback steps are documented in the
+[deployment runbook](deployment-runbook.md).
 
 ## Seed Data
 

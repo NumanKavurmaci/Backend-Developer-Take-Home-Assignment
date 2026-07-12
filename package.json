@@ -17,17 +17,16 @@
     "db:destroy": "docker compose down --volumes --remove-orphans",
     "db:setup": "npm run db:generate && npm run db:migrate",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts --demo",
+    "db:seed:verify": "tsx scripts/verify-demo-seed.ts",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:prisma": "npm run db:migrate",
     "db:reset": "prisma migrate reset",
     "db:test": "vitest run src/test/test-database.test.ts src/db/database-constraints.test.ts src/content/content-hierarchy.test.ts src/live-channel/live-channel.test.ts",
     "db:studio": "prisma studio",
-    "db:check": "tsx src/db/check.ts"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "db:check": "tsx src/db/check.ts",
+    "deploy:smoke": "tsx scripts/deployment-smoke.ts"
   },
   "engines": {
     "node": ">=24"

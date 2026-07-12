@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: saatcms-middleware-demo
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: npm ci && npm run db:generate && npm run build
+    preDeployCommand: npm run db:migrate:deploy
+    startCommand: npm start
+    healthCheckPath: /ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DEPLOYMENT_ENV
+        value: demo
+      - key: DATABASE_URL
+        fromDatabase:
+          name: saatcms-postgres-demo
+          property: connectionString
+
+databases:
+  - name: saatcms-postgres-demo
+    databaseName: saatcms
+    user: saatcms_app
+    postgresMajorVersion: "18"
+    region: frankfurt
+    plan: basic-256mb
+    ipAllowList: []
