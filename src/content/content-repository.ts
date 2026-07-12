@@ -6,9 +6,10 @@ import {
 } from "./content-metadata.js";
 import { validateContentParent } from "./content-hierarchy.js";
 import { DomainError } from "../shared/domain/domain-error.js";
+import { isPrismaErrorCode } from "../db/database-error.js";
 
 export type CreateContentInput = {
-  id: string;
+  id?: string;
   type: ContentType;
   title: string;
   parentId?: string | null;
@@ -19,6 +20,40 @@ export type CreateContentInput = {
   playbackUrl?: string | null;
   geoBlockCountriesOverride?: boolean;
   geoBlockCountries?: string[];
+};
+
+export type CmsContentRecord = Omit<Content, "type" | "quality"> & {
+  type: ContentType;
+  quality: VideoQuality | null;
+  geoBlockCountries: string[];
+};
+
+export type ListCmsContentInput = {
+  type?: ContentType;
+  parentId?: string;
+  title?: string;
+  page: number;
+  pageSize: number;
+};
+
+export type ListCmsContentResult = {
+  items: CmsContentRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type UpdateCmsContentInput = {
+  title?: string;
+  parentId?: string | null;
+  parentalRating?: string | null;
+  genre?: string | null;
+  quality?: VideoQuality | null;
+  isPremium?: boolean | null;
+  playbackUrl?: string | null;
+  geoBlockCountriesOverride?: boolean;
+  geoBlockCountries?: string[];
+  expectedUpdatedAt?: Date;
 };
 
 export type ContentWithChildren = Content & {
@@ -106,6 +141,349 @@ export async function createContent(
       geoBlockCountries: createGeoBlockCountryRows(geoBlockCountries),
     },
   });
+}
+
+const cmsContentInclude = {
+  geoBlockCountries: {
+    orderBy: { countryCode: "asc" },
+  },
+} satisfies Prisma.ContentInclude;
+
+type ContentWithGeoBlockRows = Prisma.ContentGetPayload<{
+  include: typeof cmsContentInclude;
+}>;
+
+export async function createCmsContent(
+  prisma: PrismaClient,
+  input: CreateContentInput,
+): Promise<CmsContentRecord> {
+  try {
+    const content = await prisma.$transaction(async (transaction) => {
+      assertContentType(input.type);
+      assertVideoQuality(input.quality);
+
+      const geoBlockCountriesOverride =
+        input.geoBlockCountriesOverride ?? false;
+      const geoBlockCountries = normalizeGeoBlockCountries(
+        input.geoBlockCountries,
+      );
+
+      assertGeoBlockCountryOverride(
+        geoBlockCountriesOverride,
+        geoBlockCountries,
+      );
+
+      const parent = input.parentId
+        ? await transaction.content.findUnique({
+            where: { id: input.parentId },
+            select: { id: true, type: true },
+          })
+        : null;
+
+      validateContentParent(input.type, parent);
+
+      return transaction.content.create({
+        data: {
+          id: input.id,
+          type: input.type,
+          title: input.title,
+          parentId: input.parentId ?? null,
+          parentalRating: input.parentalRating,
+          genre: input.genre,
+          quality: input.quality,
+          isPremium: input.isPremium,
+          playbackUrl: input.playbackUrl,
+          geoBlockCountriesOverride,
+          geoBlockCountries: createGeoBlockCountryRows(geoBlockCountries),
+        },
+        include: cmsContentInclude,
+      });
+    });
+
+    return toCmsContentRecord(content);
+  } catch (error) {
+    throw toContentWriteError(error);
+  }
+}
+
+export async function getCmsContent(
+  prisma: PrismaClient,
+  contentId: string,
+): Promise<CmsContentRecord | null> {
+  const content = await prisma.content.findUnique({
+    where: { id: contentId },
+    include: cmsContentInclude,
+  });
+
+  return content ? toCmsContentRecord(content) : null;
+}
+
+export async function listCmsContent(
+  prisma: PrismaClient,
+  input: ListCmsContentInput,
+): Promise<ListCmsContentResult> {
+  const where: Prisma.ContentWhereInput = {
+    type: input.type,
+    parentId: input.parentId,
+    title: input.title
+      ? { contains: input.title, mode: "insensitive" }
+      : undefined,
+  };
+  const [contents, total] = await prisma.$transaction([
+    prisma.content.findMany({
+      where,
+      include: cmsContentInclude,
+      orderBy: [{ title: "asc" }, { id: "asc" }],
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
+    }),
+    prisma.content.count({ where }),
+  ]);
+
+  return {
+    items: contents.map(toCmsContentRecord),
+    page: input.page,
+    pageSize: input.pageSize,
+    total,
+  };
+}
+
+export async function updateCmsContent(
+  prisma: PrismaClient,
+  contentId: string,
+  input: UpdateCmsContentInput,
+): Promise<CmsContentRecord> {
+  try {
+    const content = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.content.findUnique({
+        where: { id: contentId },
+        include: cmsContentInclude,
+      });
+
+      if (!current) {
+        throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
+      }
+
+      assertContentType(current.type);
+      assertVideoQuality(input.quality);
+
+      const nextParentId = input.parentId !== undefined
+        ? input.parentId ?? null
+        : current.parentId;
+      const parent = nextParentId
+        ? await transaction.content.findUnique({
+            where: { id: nextParentId },
+            select: { id: true, type: true },
+          })
+        : null;
+
+      validateContentParent(current.type, parent);
+      await assertReparentingDoesNotCreateCycle(
+        transaction,
+        contentId,
+        nextParentId,
+      );
+
+      const nextGeoBlockCountriesOverride =
+        input.geoBlockCountriesOverride ??
+        current.geoBlockCountriesOverride;
+      const nextGeoBlockCountries = input.geoBlockCountries !== undefined
+        ? normalizeGeoBlockCountries(input.geoBlockCountries)
+        : current.geoBlockCountries.map((row) => row.countryCode);
+
+      if (input.geoBlockCountries !== undefined) {
+        assertGeoBlockCountryOverride(
+          nextGeoBlockCountriesOverride,
+          nextGeoBlockCountries,
+        );
+      }
+
+      const updateResult = await transaction.content.updateMany({
+        where: {
+          id: contentId,
+          updatedAt: input.expectedUpdatedAt,
+        },
+        data: {
+          title: input.title,
+          parentId: input.parentId,
+          parentalRating: input.parentalRating,
+          genre: input.genre,
+          quality: input.quality,
+          isPremium: input.isPremium,
+          playbackUrl: input.playbackUrl,
+          geoBlockCountriesOverride: input.geoBlockCountriesOverride,
+          updatedAt: nextUpdatedAt(current.updatedAt),
+        },
+      });
+
+      if (updateResult.count === 0) {
+        throw new DomainError(
+          "CONTENT_WRITE_CONFLICT",
+          "Content changed after it was read. Fetch the latest version and retry.",
+        );
+      }
+
+      if (
+        input.geoBlockCountries !== undefined ||
+        input.geoBlockCountriesOverride === false
+      ) {
+        await transaction.contentGeoBlockCountry.deleteMany({
+          where: { contentId },
+        });
+
+        if (nextGeoBlockCountriesOverride && nextGeoBlockCountries.length > 0) {
+          await transaction.contentGeoBlockCountry.createMany({
+            data: nextGeoBlockCountries.map((countryCode) => ({
+              contentId,
+              countryCode,
+            })),
+          });
+        }
+      }
+
+      const updated = await transaction.content.findUnique({
+        where: { id: contentId },
+        include: cmsContentInclude,
+      });
+
+      if (!updated) {
+        throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
+      }
+
+      return updated;
+    });
+
+    return toCmsContentRecord(content);
+  } catch (error) {
+    throw toContentWriteError(error);
+  }
+}
+
+export async function deleteCmsContent(
+  prisma: PrismaClient,
+  contentId: string,
+): Promise<void> {
+  try {
+    await prisma.$transaction(async (transaction) => {
+      const lockedRows = await transaction.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "Content"
+        WHERE "id" = ${contentId}
+        FOR UPDATE
+      `;
+
+      if (lockedRows.length === 0) {
+        throw new DomainError("CONTENT_NOT_FOUND", "Content not found");
+      }
+
+      const childCount = await transaction.content.count({
+        where: { parentId: contentId },
+      });
+
+      if (childCount > 0) {
+        throw new DomainError(
+          "CONTENT_HAS_CHILDREN",
+          "Content with children cannot be deleted.",
+        );
+      }
+
+      await transaction.content.delete({ where: { id: contentId } });
+    });
+  } catch (error) {
+    if (isPrismaErrorCode(error, "P2003")) {
+      throw new DomainError(
+        "CONTENT_HAS_CHILDREN",
+        "Content with children cannot be deleted.",
+      );
+    }
+
+    throw toContentWriteError(error);
+  }
+}
+
+function assertGeoBlockCountryOverride(
+  geoBlockCountriesOverride: boolean,
+  geoBlockCountries: string[],
+): void {
+  if (!geoBlockCountriesOverride && geoBlockCountries.length > 0) {
+    throw new DomainError(
+      "INVALID_CONTENT_GEO_BLOCK_COUNTRIES",
+      "geoBlockCountries can only be provided when geoBlockCountriesOverride is true.",
+    );
+  }
+}
+
+async function assertReparentingDoesNotCreateCycle(
+  transaction: Prisma.TransactionClient,
+  contentId: string,
+  parentId: string | null,
+): Promise<void> {
+  let ancestorId = parentId;
+
+  for (let depth = 0; ancestorId !== null; depth += 1) {
+    if (ancestorId === contentId) {
+      throw new DomainError(
+        "INVALID_CONTENT_HIERARCHY",
+        "A content item cannot be parented to itself or one of its descendants.",
+      );
+    }
+
+    if (depth >= MAX_CONTENT_HIERARCHY_DEPTH) {
+      throw new DomainError(
+        "INVALID_CONTENT_HIERARCHY",
+        `Content hierarchy exceeds max depth of ${MAX_CONTENT_HIERARCHY_DEPTH}.`,
+      );
+    }
+
+    const ancestor: { parentId: string | null } | null =
+      await transaction.content.findUnique({
+        where: { id: ancestorId },
+        select: { parentId: true },
+      });
+    ancestorId = ancestor?.parentId ?? null;
+  }
+}
+
+function nextUpdatedAt(currentUpdatedAt: Date): Date {
+  return new Date(Math.max(Date.now(), currentUpdatedAt.getTime() + 1));
+}
+
+function toCmsContentRecord(
+  content: ContentWithGeoBlockRows,
+): CmsContentRecord {
+  assertContentType(content.type);
+  assertVideoQuality(content.quality);
+
+  return {
+    ...content,
+    type: content.type,
+    quality: content.quality,
+    geoBlockCountries: content.geoBlockCountries.map(
+      ({ countryCode }) => countryCode,
+    ),
+  };
+}
+
+function toContentWriteError(error: unknown): unknown {
+  if (error instanceof DomainError) {
+    return error;
+  }
+
+  if (isPrismaErrorCode(error, "P2002")) {
+    return new DomainError(
+      "CONTENT_ID_CONFLICT",
+      "A content item with this ID already exists.",
+    );
+  }
+
+  if (isPrismaErrorCode(error, "P2003")) {
+    return new DomainError(
+      "INVALID_CONTENT_HIERARCHY",
+      "The selected content parent no longer exists.",
+    );
+  }
+
+  return error;
 }
 
 export async function getContentWithChildren(
