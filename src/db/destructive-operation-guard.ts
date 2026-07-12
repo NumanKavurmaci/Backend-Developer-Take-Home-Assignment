@@ -57,7 +57,7 @@ export function validateDestructiveDatabaseTarget(
       schemaName !== "public"
     ) {
       throw new Error(
-        "Destructive database operation refused: local targets must be the loopback saatcms/public database outside production mode.",
+        "Destructive database operation refused: local targets must use a loopback PostgreSQL host and the public schema outside production mode.",
       );
     }
   } else if (deploymentEnvironment === "test") {

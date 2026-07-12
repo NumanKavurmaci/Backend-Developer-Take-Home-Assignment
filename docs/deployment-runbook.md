@@ -71,6 +71,14 @@ playback, geo blocking, and device blocking. Every request has a ten-second
 timeout. EPG write/concurrency checks run in CI against disposable isolated test
 databases; deployed smoke checks remain read-only and leave no residual rows.
 
+For a brand-new disposable demo environment, steps 3 through 6 can be run from
+a one-off shell with `npm run deploy:setup`. The command applies committed
+migrations, checks connectivity, loads the guarded demo seed, verifies its
+record counts, and runs the deployed smoke suite. It requires `DATABASE_URL`,
+`DEPLOYMENT_ENV=demo`, `DEMO_DATABASE_CONFIRMATION`, and `DEPLOYMENT_URL` to
+identify the intended environment. Never use it for production because it
+intentionally seeds sample data.
+
 ## Backup and Restore Rehearsal
 
 Complete this before cutover.

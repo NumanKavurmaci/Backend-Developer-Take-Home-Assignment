@@ -38,14 +38,15 @@ describe("destructive database operation guard", () => {
     },
   );
 
-  it("accepts the exact local and generated test allowlists", () => {
+  it("accepts configurable local database names and generated test databases", () => {
     expect(
       validateDestructiveDatabaseTarget({
         NODE_ENV: "development",
         DEPLOYMENT_ENV: "local",
-        DATABASE_URL: localUrl,
+        DATABASE_URL:
+          "postgresql://user:password@localhost:5432/customer_local?schema=public",
       }),
-    ).toEqual({ databaseName: "saatcms", schemaName: "public" });
+    ).toEqual({ databaseName: "customer_local", schemaName: "public" });
 
     expect(
       validateDestructiveDatabaseTarget({
@@ -57,21 +58,32 @@ describe("destructive database operation guard", () => {
     ).toEqual({ databaseName: "saatcms_test_1_abc", schemaName: "public" });
   });
 
-  it("requires production demo confirmation tied to database identity", () => {
+  it("accepts a configurable demo database with exact identity confirmation", () => {
     const environment = {
       NODE_ENV: "production",
       DEPLOYMENT_ENV: "demo",
-      DATABASE_URL: "postgresql://user:secret@private-db/saatcms?schema=public",
+      DATABASE_URL:
+        "postgresql://user:secret@private-db/provider_generated_name?schema=public",
     };
 
     expect(() => validateDestructiveDatabaseTarget(environment)).toThrow(
-      "DEMO_DATABASE_CONFIRMATION=private-db/saatcms/public",
+      "DEMO_DATABASE_CONFIRMATION=private-db/provider_generated_name/public",
     );
     expect(
       validateDestructiveDatabaseTarget({
         ...environment,
-        DEMO_DATABASE_CONFIRMATION: "private-db/saatcms/public",
+        DEMO_DATABASE_CONFIRMATION:
+          "private-db/provider_generated_name/public",
       }),
-    ).toEqual({ databaseName: "saatcms", schemaName: "public" });
+    ).toEqual({ databaseName: "provider_generated_name", schemaName: "public" });
+
+    expect(() =>
+      validateDestructiveDatabaseTarget({
+        ...environment,
+        DEMO_DATABASE_CONFIRMATION: "private-db/different_database/public",
+      }),
+    ).toThrow(
+      "DEMO_DATABASE_CONFIRMATION=private-db/provider_generated_name/public",
+    );
   });
 });

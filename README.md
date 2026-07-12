@@ -92,6 +92,7 @@ npm run db:destroy
 | `npm run db:seed:verify` | Verify the expected demo records exist |
 | `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
 | `npm run deploy:smoke` | Run deployed API and HTTP concurrency checks using `DEPLOYMENT_URL` |
+| `npm run deploy:setup` | Initialize and verify a disposable demo deployment end to end |
 | `npm run typecheck` | Run TypeScript checks |
 | `npm test` | Run the automated test suite against a disposable test database |
 | `npm run test:coverage` | Run the automated test suite with the 90% line coverage gate |
@@ -102,13 +103,16 @@ or running the seed script. Application startup never migrates, resets, or
 seeds the database automatically.
 
 `db:reset` and `db:seed` share a fail-closed target guard. They require an
-explicit `DEPLOYMENT_ENV`, a strict database/schema allowlist, and a live
-database identity check before any deletion. Local/test operations only accept
-loopback `saatcms` or generated `saatcms_test_*` databases. Demo seeding also
-requires `NODE_ENV=production` and
-`DEMO_DATABASE_CONFIRMATION=<database-host>/saatcms/public`; production and staging targets are
-always rejected. Reset does not seed automatically, and the entire demo seed is
-committed atomically only after its expected counts are verified.
+explicit `DEPLOYMENT_ENV`, an environment-specific host/schema policy, and a
+live database identity check before any deletion. Local operations accept a
+configurable database name only on a loopback PostgreSQL host with the `public`
+schema outside production mode. Test operations additionally require a
+generated `saatcms_test_*` database. Demo seeding requires
+`NODE_ENV=production` and an exact
+`DEMO_DATABASE_CONFIRMATION=<database-host>/<database-name>/public` value;
+production and staging targets are always rejected. Reset does not seed
+automatically, and the entire demo seed is committed atomically only after its
+expected counts are verified.
 
 ## Shared Demo Deployment
 
@@ -147,6 +151,18 @@ npm ci
 $env:DEPLOYMENT_URL="https://your-service.example.com"
 npm run deploy:smoke
 ```
+
+For a new **disposable demo** database, the migration, connectivity check,
+guarded seed, seed verification, and deployed smoke check can be run as one
+operation after setting `DATABASE_URL`, `DEPLOYMENT_ENV=demo`,
+`DEMO_DATABASE_CONFIRMATION`, and `DEPLOYMENT_URL`:
+
+```bash
+npm run deploy:setup
+```
+
+This command seeds data and is therefore not a production deployment command.
+Use `npm run db:migrate:deploy` followed by read-only checks for production.
 
 Provisioning, rehearsal, backup/restore, cutover, and rollback instructions are
 in the [deployment runbook](docs/deployment-runbook.md).
