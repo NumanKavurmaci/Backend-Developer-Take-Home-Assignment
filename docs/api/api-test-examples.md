@@ -19,6 +19,15 @@ Base URL:
 http://localhost:3000
 ```
 
+CMS examples require the editor bearer key from `.env.example`:
+
+```bash
+CMS_EDITOR_KEY="local-editor-key-0123456789abcdef012345678"
+```
+
+The full Content, Live Channel, and EPG CRUD reference and additional cURL
+examples are in [CMS CRUD API](cms-crud-api.md).
+
 Seeded IDs used below:
 
 | Purpose | ID |
@@ -70,6 +79,7 @@ Request headers:
 ```http
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer <editor key>
 ```
 
 Request body:
@@ -84,6 +94,7 @@ Request body:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"programName":"Evening News","startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
@@ -118,6 +129,7 @@ Request headers:
 ```http
 Content-Type: application/json
 Accept: application/json
+Authorization: Bearer <editor key>
 ```
 
 Request body:
@@ -132,6 +144,7 @@ Request body:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json" \
   -d '{"programName":"Overlapping News","startTime":"2026-07-02T08:30:00Z","endTime":"2026-07-02T09:30:00Z"}'
@@ -309,6 +322,7 @@ Create a Postman collection with this environment variable:
 | Variable | Value |
 | --- | --- |
 | `baseUrl` | `http://localhost:3000` |
+| `cmsEditorKey` | `local-editor-key-0123456789abcdef012345678` |
 
 Then add these requests.
 
@@ -328,7 +342,7 @@ Then add these requests.
 | --- | --- |
 | Method | `POST` |
 | URL | `{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg` |
-| Headers | `Content-Type: application/json`, `Accept: application/json` |
+| Headers | `Authorization: Bearer {{cmsEditorKey}}`, `Content-Type: application/json`, `Accept: application/json` |
 | Body mode | Raw JSON |
 | Expected status | `201 Created` |
 
@@ -348,7 +362,7 @@ Body:
 | --- | --- |
 | Method | `POST` |
 | URL | `{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg` |
-| Headers | `Content-Type: application/json`, `Accept: application/json` |
+| Headers | `Authorization: Bearer {{cmsEditorKey}}`, `Content-Type: application/json`, `Accept: application/json` |
 | Body mode | Raw JSON |
 | Expected status | `400 Bad Request` |
 

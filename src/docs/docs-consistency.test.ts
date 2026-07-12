@@ -132,13 +132,65 @@ describe("documentation consistency", () => {
       expect.arrayContaining([
         "Successful metadata resolution",
         "Successful EPG creation",
+        "CMS authentication required",
         "EPG overlap blocked",
         "Successful playback request",
         "Geo-blocked playback request",
         "Device-blocked playback request",
         "Malformed country header",
+        "Create CMS content",
+        "Update CMS content with ETag",
+        "Delete CMS content",
+        "Create live channel",
+        "Delete live channel with confirmation",
+        "List EPG programs",
+        "Update EPG program with ETag",
+        "Delete EPG program",
       ]),
     );
+  });
+
+  it("publishes the complete authenticated CMS CRUD contract", async () => {
+    const [openApi, cmsCrudDoc, readme, collection] = await Promise.all([
+      readFile(
+        path.join(rootDir, "docs", "api", "cms-crud-openapi.yaml"),
+        "utf8",
+      ),
+      readFile(
+        path.join(rootDir, "docs", "api", "cms-crud-api.md"),
+        "utf8",
+      ),
+      readFile(path.join(rootDir, "README.md"), "utf8"),
+      readFile(
+        path.join(
+          rootDir,
+          "docs",
+          "api",
+          "saatcms-api-tests.postman_collection.json",
+        ),
+        "utf8",
+      ),
+    ]);
+
+    for (const route of [
+      "/api/v1/cms/content:",
+      "/api/v1/cms/content/{id}:",
+      "/api/v1/cms/channels:",
+      "/api/v1/cms/channels/{channelId}:",
+      "/api/v1/cms/channels/{channelId}/epg:",
+      "/api/v1/cms/channels/{channelId}/epg/{programId}:",
+    ]) {
+      expect(openApi).toContain(route);
+    }
+
+    expect(openApi).toContain("bearerAuth:");
+    expect(openApi).toContain("If-Match");
+    expect(cmsCrudDoc).toContain("CONTENT_HAS_CHILDREN");
+    expect(cmsCrudDoc).toContain("LIVE_CHANNEL_WRITE_CONFLICT");
+    expect(cmsCrudDoc).toContain("EPG_WRITE_CONFLICT");
+    expect(readme).toContain("CMS Authentication and Write Safety");
+    expect(collection).toContain("Bearer {{cmsEditorKey}}");
+    expect(collection).toContain("Bearer {{cmsAdminKey}}");
   });
 });
 

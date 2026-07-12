@@ -13,6 +13,14 @@ This is not a generic database-table editor. CRUD operations will be implemented
 
 `EpgScheduleLock` is internal infrastructure and will not have public CRUD endpoints.
 
+## Implementation Status
+
+**Complete on `feature/crud-operations`.** The domain APIs, authentication and
+roles, structured audit events, rate/body limits, optimistic concurrency,
+rollback switch, automated tests, OpenAPI contract, and Postman requests are
+implemented. Deployment still requires real CMS keys through the platform
+secret store.
+
 ## Recommended API Scope
 
 | Resource     | Create                                              | Read                                                 | List                                      | Update                                                 | Delete                                                  |
@@ -53,6 +61,8 @@ This is not a generic database-table editor. CRUD operations will be implemented
 Estimated total: **39 story points**, approximately 2–3 weeks for one developer including review and stabilization.
 
 ## CRUD-01 — API and Lifecycle Contract
+
+Delivery status: **CRUD-01 through CRUD-07 are complete.**
 
 Define request/response schemas, pagination, filters, status codes, error codes, deletion semantics, and authorization roles before implementation.
 
@@ -186,11 +196,20 @@ Do not expose database mutations as anonymous public endpoints.
 - API documentation and Postman examples match the implemented behavior.
 - Existing middleware content/playback endpoints and EPG creation behavior remain backward-compatible.
 
-## Open Decisions Before Implementation
+## Decisions Applied
 
-- Authentication provider and exact CMS roles.
-- Hard delete versus soft delete/archive for production data.
-- Retention and storage destination for audit history.
-- Whether optimistic concurrency will use `If-Match`/ETags or an explicit version field.
-- Whether content IDs remain client-supplied or become server-generated.
-- Required list pagination style and default limits.
+- CMS credentials use high-entropy bearer keys with `reader`, `editor`, and
+  `admin` roles for this prototype. A managed identity provider remains the
+  recommended production replacement.
+- The prototype uses hard deletes. Content with children is protected; live
+  channel cascade deletion requires an admin role and `confirm=true`.
+- Audit events are structured, payload-free logs suitable for aggregation into
+  operation/error metrics. Production retention should use a durable external
+  collector or transactional outbox.
+- Optimistic concurrency uses optional strong `ETag`/`If-Match` values derived
+  from `updatedAt`.
+- Public Content, Live Channel, and EPG IDs are server-generated.
+- Lists use page-based pagination with defaults `page=1`, `pageSize=20`, and a
+  maximum page size of `100`.
+- `CMS_MUTATIONS_ENABLED=false` is the rollback control for stopping writes
+  without disabling CMS reads or middleware APIs.

@@ -13,7 +13,7 @@ The project implements the core middleware and CMS scheduling concerns from the 
 | Metadata inheritance | `Series -> Season -> Episode` resolution                   |
 | Content metadata API | `GET /api/v1/mw/content/{contentId}`                       |
 | Playback API         | `GET /api/v1/mw/playback/{contentId}` with request headers |
-| CMS EPG API          | `POST /api/v1/cms/channels/{channelId}/epg`                |
+| CMS management APIs  | Authenticated CRUD for content, channels, and EPG programs |
 | EPG validation       | ISO date-time parsing, UTC normalization, overlap blocking |
 | Concurrency model    | Per-channel lock row plus PostgreSQL exclusion constraint  |
 | Observability        | `X-Request-Id` correlation and structured request logs     |
@@ -39,6 +39,10 @@ http://localhost:3000
 ```
 
 The active Prisma schema and committed migration history target PostgreSQL.
+
+The example environment contains local-only CMS reader, editor, and admin
+bearer keys. Replace them through the deployment secret store outside local
+development; never reuse the example values in a shared environment.
 
 ### Local PostgreSQL
 
@@ -167,6 +171,42 @@ Use `npm run db:migrate:deploy` followed by read-only checks for production.
 Provisioning, rehearsal, backup/restore, cutover, and rollback instructions are
 in the [deployment runbook](docs/ci-cd/deployment-runbook.md).
 
+## CMS Authentication and Write Safety
+
+Every `/api/v1/cms/*` route requires `Authorization: Bearer <key>`. Configure
+comma-separated credentials through `CMS_API_KEYS` using
+`actorId:role:secret`. Secrets must contain at least 32 characters, and
+multiple keys may share an actor and role during rotation.
+
+| Role | Permissions |
+| --- | --- |
+| `reader` | CMS read and list endpoints |
+| `editor` | Reader access plus create, patch, content delete, and EPG delete |
+| `admin` | Editor access plus destructive live-channel cascade deletion |
+
+CMS authentication fails closed when credentials are absent. Request bodies
+and authentication attempts are limited before controller execution;
+authenticated actors also have a per-minute quota. Successful and rejected CMS
+operations emit structured `cms_audit` events containing actor, role, request
+ID, operation, resource, result, and error code without payloads or tokens. The
+built-in sink is best-effort structured logging; deployments requiring durable
+audit retention should forward these events to a durable collector or
+transactional outbox.
+
+Single-resource create, read, and update responses include a strong `ETag`
+derived from `updatedAt`. Send it as `If-Match` on `PATCH` to reject stale edits
+with `409 CONTENT_WRITE_CONFLICT`, `LIVE_CHANNEL_WRITE_CONFLICT`, or
+`EPG_WRITE_CONFLICT`. The precondition remains optional for backward
+compatibility.
+
+Set `CMS_MUTATIONS_ENABLED=false` to stop CMS writes during rollback or an
+incident while keeping CMS reads and all `/api/v1/mw/*` endpoints available.
+
+```bash
+curl http://localhost:3000/api/v1/cms/content \
+  -H "Authorization: Bearer local-reader-key-0123456789abcdef0123456789"
+```
+
 ## API Surface
 
 | Endpoint                                    | Purpose                                      | Details                                                  |
@@ -174,7 +214,9 @@ in the [deployment runbook](docs/ci-cd/deployment-runbook.md).
 | `GET /health`                               | Liveness check                               | This README                                              |
 | `GET /ready`                                | Database readiness check                     | This README                                              |
 | `GET /api/v1/mw/content/{contentId}`        | Resolve inherited content metadata           | [Content metadata API](docs/api/content-metadata-api.md) |
-| `POST /api/v1/cms/channels/{channelId}/epg` | Create an EPG program for a live channel     | [CMS EPG program API](docs/api/cms-epg-program-api.md)   |
+| `/api/v1/cms/content`                       | Authenticated Content CRUD                    | [CMS CRUD API](docs/api/cms-crud-api.md)                 |
+| `/api/v1/cms/channels`                      | Authenticated Live Channel CRUD               | [CMS CRUD API](docs/api/cms-crud-api.md)                 |
+| `/api/v1/cms/channels/{channelId}/epg`      | Authenticated EPG Program CRUD                | [CMS EPG program API](docs/api/cms-epg-program-api.md)   |
 | `GET /api/v1/mw/playback/{contentId}`       | Request playback after geo and device checks | [Middleware playback API](docs/api/mw-playback-api.md)   |
 
 Reviewer-ready cURL examples and Postman requests are collected in [API test examples](docs/api/api-test-examples.md). The importable Postman collection lives at [docs/api/saatcms-api-tests.postman_collection.json](docs/api/saatcms-api-tests.postman_collection.json).
@@ -220,6 +262,8 @@ Every response includes `X-Request-Id`. If the caller sends `X-Request-Id`, the 
 | API test examples                     | [docs/api/api-test-examples.md](docs/api/api-test-examples.md)                                                                 |
 | Postman collection                    | [docs/api/saatcms-api-tests.postman_collection.json](docs/api/saatcms-api-tests.postman_collection.json)                       |
 | Content metadata API                  | [docs/api/content-metadata-api.md](docs/api/content-metadata-api.md)                                                           |
+| CMS CRUD API                          | [docs/api/cms-crud-api.md](docs/api/cms-crud-api.md)                                                                           |
+| CMS CRUD OpenAPI                      | [docs/api/cms-crud-openapi.yaml](docs/api/cms-crud-openapi.yaml)                                                               |
 | CMS EPG program API                   | [docs/api/cms-epg-program-api.md](docs/api/cms-epg-program-api.md)                                                             |
 | Middleware playback API               | [docs/api/mw-playback-api.md](docs/api/mw-playback-api.md)                                                                     |
 | Database structure                    | [docs/database/database-structure.md](docs/database/database-structure.md)                                                     |
@@ -240,10 +284,12 @@ src/
   content/                      Content hierarchy and metadata inheritance logic
   live-channel/                 Live channel and EPG program domain logic
   modules/
+    cms-content/                CMS Content CRUD HTTP module
+    cms-live-channel/           CMS Live Channel CRUD HTTP module
     cms-epg-program/            CMS EPG HTTP module
     mw-content/                 Middleware content metadata HTTP module
     mw-playback/                Middleware playback HTTP module
-  shared/http/                  Shared HTTP error handling
+  shared/http/                  Errors, CMS security/audit, and ETag handling
   db/                           Prisma client and database checks
 docs/                           API, domain, database, and project notes
 prisma/                         Prisma schema, migrations, and seed data

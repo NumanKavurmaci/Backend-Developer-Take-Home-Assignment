@@ -7,6 +7,18 @@
     {
       "key": "baseUrl",
       "value": "http://localhost:3000"
+    },
+    {
+      "key": "cmsReaderKey",
+      "value": "local-reader-key-0123456789abcdef0123456789"
+    },
+    {
+      "key": "cmsEditorKey",
+      "value": "local-editor-key-0123456789abcdef012345678"
+    },
+    {
+      "key": "cmsAdminKey",
+      "value": "local-admin-key-0123456789abcdef0123456789"
     }
   ],
   "item": [
@@ -37,6 +49,28 @@
       ]
     },
     {
+      "name": "CMS authentication required",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/v1/cms/content"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"anonymous CMS access is rejected\", function () {",
+              "  pm.response.to.have.status(401);",
+              "  pm.expect(pm.response.json().errorCode).to.eql(\"CMS_AUTHENTICATION_REQUIRED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Successful EPG creation",
       "request": {
         "method": "POST",
@@ -48,6 +82,10 @@
           {
             "key": "Accept",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
           }
         ],
         "body": {
@@ -60,7 +98,20 @@
           }
         },
         "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg"
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"EPG program created\", function () { pm.response.to.have.status(201); });",
+              "pm.collectionVariables.set(\"epgProgramId\", pm.response.json().id);",
+              "pm.collectionVariables.set(\"epgProgramEtag\", pm.response.headers.get(\"ETag\"));"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "EPG overlap blocked",
@@ -74,6 +125,10 @@
           {
             "key": "Accept",
             "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
           }
         ],
         "body": {
@@ -86,6 +141,193 @@
           }
         },
         "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg"
+      }
+    },
+    {
+      "name": "List EPG programs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsReaderKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg?windowStart=2026-07-02T00%3A00%3A00Z&windowEnd=2026-07-03T00%3A00%3A00Z&page=1&pageSize=20"
+      }
+    },
+    {
+      "name": "Update EPG program with ETag",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          },
+          {
+            "key": "If-Match",
+            "value": "{{epgProgramEtag}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"programName\":\"Updated Evening News\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg/{{epgProgramId}}"
+      }
+    },
+    {
+      "name": "Delete EPG program",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cms/channels/channel-saat-news/epg/{{epgProgramId}}"
+      }
+    },
+    {
+      "name": "Create CMS content",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"type\":\"MOVIE\",\"title\":\"Postman CRUD Movie\",\"quality\":\"HD\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/content"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"cmsContentId\", pm.response.json().id);",
+              "pm.collectionVariables.set(\"cmsContentEtag\", pm.response.headers.get(\"ETag\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update CMS content with ETag",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          },
+          {
+            "key": "If-Match",
+            "value": "{{cmsContentEtag}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"Updated Postman CRUD Movie\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/content/{{cmsContentId}}"
+      }
+    },
+    {
+      "name": "Delete CMS content",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cms/content/{{cmsContentId}}"
+      }
+    },
+    {
+      "name": "Create live channel",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsEditorKey}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Postman CRUD Channel\",\"slug\":\"postman-crud-channel\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{baseUrl}}/api/v1/cms/channels"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set(\"cmsChannelId\", pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Delete live channel with confirmation",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{cmsAdminKey}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/v1/cms/channels/{{cmsChannelId}}?confirm=true"
       }
     },
     {
