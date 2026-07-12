@@ -41,6 +41,7 @@ function options(generatedAt = "2026-07-12T20:00:00.000Z"): WriteCatalogArtifact
       ...DEFAULT_CATALOG_LIMITS,
       tvmazeStartPage: 0,
       maxPages: 1,
+      fetchConcurrency: 16,
       offline: true,
     },
     scenarioIds: applyDeterministicDemoPolicies(policyFixtureChunk()).scenarioIds,
@@ -86,6 +87,7 @@ describe("versioned catalog artifact", () => {
         ...DEFAULT_CATALOG_LIMITS,
         tvmazeStartPage: 0,
         maxPages: 1,
+        fetchConcurrency: 16,
         offline: true,
       },
       scenarioIds: {

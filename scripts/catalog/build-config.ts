@@ -38,7 +38,7 @@ export function readCatalogBuildConfig(
       limitArguments.push(argument);
       continue;
     }
-    if (!["start-page", "max-pages", "cache-dir", "output-dir", "offline"].includes(key)) {
+    if (!["start-page", "max-pages", "fetch-concurrency", "cache-dir", "output-dir", "offline"].includes(key)) {
       throw new Error(`Unknown catalog build option: --${key}.`);
     }
     if (values.has(key) || (key === "offline" && offlineArgument !== undefined)) {
@@ -70,6 +70,13 @@ export function readCatalogBuildConfig(
         values.get("max-pages") ?? environment.CATALOG_TVMAZE_MAX_PAGES ?? "1",
         "maximum pages",
         10_000,
+      ),
+      fetchConcurrency: readPositiveInteger(
+        values.get("fetch-concurrency") ??
+          environment.CATALOG_FETCH_CONCURRENCY ??
+          "16",
+        "fetch concurrency",
+        64,
       ),
       offline,
     },

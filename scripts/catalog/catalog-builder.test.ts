@@ -23,6 +23,7 @@ function config(overrides: Partial<CatalogArtifactConfiguration> = {}): CatalogA
     maxContentRows: 100,
     tvmazeStartPage: 0,
     maxPages: 2,
+    fetchConcurrency: 4,
     offline: true,
     ...overrides,
   };
@@ -88,6 +89,46 @@ describe("TVmaze catalog build orchestration", () => {
     expect(result.chunk.content.filter((row) => row.type === "EPISODE").map((row) => row.id)).toEqual([
       "tvmaze-episode-1001", "tvmaze-episode-1002", "tvmaze-episode-1003",
     ]);
+  });
+
+  it("normalizes cached Shows concurrently up to the configured worker limit", async () => {
+    let activeSeasonReads = 0;
+    let maximumActiveSeasonReads = 0;
+    class ConcurrentFixtureSource extends FixtureSource {
+      override async getShowSeasons(showId: number) {
+        activeSeasonReads += 1;
+        maximumActiveSeasonReads = Math.max(maximumActiveSeasonReads, activeSeasonReads);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        activeSeasonReads -= 1;
+        return super.getShowSeasons(showId);
+      }
+    }
+    const result = await buildCatalogFromTvMaze(
+      new ConcurrentFixtureSource([show(1), show(2), show(3), show(4)]),
+      config({ maxShows: 4, fetchConcurrency: 3 }),
+    );
+    expect(maximumActiveSeasonReads).toBe(3);
+    expect(result.summary.showsIncluded).toBe(4);
+  });
+
+  it("keeps the largest complete Show prefix within the database guard", async () => {
+    const oneShow = await buildCatalogFromTvMaze(
+      new FixtureSource([show(1)]),
+      config({ maxShows: 1 }),
+    );
+    const result = await buildCatalogFromTvMaze(
+      new FixtureSource([show(1), show(2)]),
+      config({
+        maxShows: 2,
+        maxEstimatedDatabaseBytes: oneShow.estimatedDatabaseBytes,
+      }),
+    );
+    expect(result.summary).toMatchObject({
+      showsIncluded: 1,
+      stopReason: "max-estimated-database-bytes",
+    });
+    expect(result.estimatedDatabaseBytes).toBe(oneShow.estimatedDatabaseBytes);
+    expect(result.chunk.content.some((row) => row.id === "tvmaze-series-2")).toBe(false);
   });
 
   it("excludes provider Season zero and its special Episodes", async () => {

@@ -24,6 +24,7 @@ $env:CATALOG_MAX_SHOWS="5"
 $env:CATALOG_MAX_EPISODES_PER_SHOW="50"
 $env:CATALOG_MAX_CONTENT_ROWS="500"
 $env:CATALOG_TVMAZE_MAX_PAGES="1"
+$env:CATALOG_FETCH_CONCURRENCY="16"
 $env:CATALOG_OUTPUT_DIR="data/catalog/current"
 npm run catalog:build
 ```
@@ -37,6 +38,28 @@ npx tsx scripts/catalog/build-catalog.ts --max-shows=5 --max-episodes-per-show=5
 Replay only cached responses by setting `CATALOG_OFFLINE=true` or passing
 `--offline` to the underlying CLI. The output target must not already exist;
 the writer refuses replacement rather than deleting an artifact implicitly.
+
+Cached Shows are normalized by a bounded worker pool. The default concurrency
+is 16 and the supported maximum is 64. A high-throughput offline replay on a
+machine with ample CPU and RAM can use:
+
+```powershell
+$env:CATALOG_OFFLINE="true"
+$env:CATALOG_FETCH_CONCURRENCY="64"
+$env:CATALOG_OUTPUT_DIR="data/catalog/catalog-660-series-fast"
+npm run catalog:build
+```
+
+Online builds use the same worker pool, but the shared TVmaze client still
+paces network request starts and honors retries and `429` backoff. Increasing
+concurrency primarily accelerates cache reads, JSON decoding, and normalization;
+it does not bypass the provider's rate limit.
+
+The builder accumulates complete Show hierarchies and performs whole-catalog
+policy generation, validation, and byte estimation only after collection. If
+the result exceeds a storage guard, it uses a logarithmic search to retain the
+largest complete deterministic Show prefix that fits. Episodes and Seasons are
+never partially cut from a Show to satisfy the storage budget.
 
 During a build, progress is written to stderr. Source progress reports completed
 operations, cache hits, network responses, retries, cached bytes read, and new

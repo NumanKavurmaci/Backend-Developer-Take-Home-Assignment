@@ -12,6 +12,7 @@ import type { CatalogLimits } from "./config.js";
 export interface CatalogArtifactConfiguration extends CatalogLimits {
   tvmazeStartPage: number;
   maxPages: number;
+  fetchConcurrency: number;
   offline: boolean;
 }
 

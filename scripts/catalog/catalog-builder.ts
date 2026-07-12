@@ -2,7 +2,7 @@ import { calculateArtifactNormalizedBytes } from "./artifact.js";
 import { assertEstimatedDatabaseBudget } from "./budget.js";
 import type { CatalogArtifactConfiguration } from "./artifact-types.js";
 import { applyDeterministicDemoPolicies, type GeneratedCatalogPolicies } from "./policies.js";
-import type { TvMazeEpisode } from "./tvmaze-contracts.js";
+import type { TvMazeEpisode, TvMazeShow } from "./tvmaze-contracts.js";
 import type { TvMazeCatalogSource } from "./tvmaze-source.js";
 import { isUsableTvMazeShow } from "./tvmaze-normalize.js";
 import { normalizeTvMazeHierarchy } from "./tvmaze-hierarchy.js";
@@ -47,15 +47,10 @@ export async function buildCatalogFromTvMaze(
   config: CatalogArtifactConfiguration,
   onProgress: (event: CatalogBuildProgressEvent) => void = () => undefined,
 ): Promise<CatalogBuildResult> {
-  let combined: NormalizedCatalogChunk = {
-    content: [],
-    geoBlocks: [],
-    derivedSeasons: [],
-  };
+  const acceptedShows: AcceptedShow[] = [];
   let pagesFetched = 0;
-  let showsIncluded = 0;
+  let totalRows = 0;
   const showsSkipped: Array<{ showId: number; reason: string }> = [];
-  const excludedEpisodes: ExcludedProviderRecord[] = [];
   const seenShowIds = new Set<number>();
   let stopReason: CatalogBuildStopReason = "max-pages";
 
@@ -77,85 +72,67 @@ export async function buildCatalogFromTvMaze(
       break;
     }
 
-    for (const show of [...shows].sort((left, right) => left.id - right.id)) {
-      if (showsIncluded >= config.maxShows) {
+    const uniqueShows = [...shows]
+      .sort((left, right) => left.id - right.id)
+      .filter((show) => {
+        if (seenShowIds.has(show.id)) return false;
+        seenShowIds.add(show.id);
+        return true;
+      });
+
+    for (let offset = 0; offset < uniqueShows.length;) {
+      const remainingShowSlots = config.maxShows - acceptedShows.length;
+      if (remainingShowSlots <= 0) {
         stopReason = "max-shows";
         break outer;
       }
-      if (seenShowIds.has(show.id)) continue;
-      seenShowIds.add(show.id);
-      if (!isUsableTvMazeShow(show)) {
-        showsSkipped.push({ showId: show.id, reason: "INELIGIBLE_SHOW" });
-        onProgress({ type: "show-skipped", showId: show.id, reason: "INELIGIBLE_SHOW" });
-        continue;
-      }
-
-      const [seasons, sourceEpisodes] = await Promise.all([
-        source.getShowSeasons(show.id),
-        source.getShowEpisodes(show.id),
-      ]);
-      const episodes = limitRegularEpisodes(
-        sourceEpisodes,
-        config.maxEpisodesPerShow,
+      const batchSize = Math.min(
+        config.fetchConcurrency,
+        remainingShowSlots,
+        uniqueShows.length - offset,
       );
-      const normalized = normalizeTvMazeHierarchy({
-        show,
-        seasons: seasons.filter(
-          (season) => Number.isSafeInteger(season.number) && season.number > 0,
-        ),
-        episodes,
-      });
-      if (normalized.status === "skipped") {
-        showsSkipped.push({ showId: show.id, reason: normalized.reason });
-        onProgress({ type: "show-skipped", showId: show.id, reason: normalized.reason });
-        continue;
-      }
+      const batch = uniqueShows.slice(offset, offset + batchSize);
+      offset += batchSize;
+      const processed = await Promise.all(
+        batch.map((show) => processShow(source, show, config)),
+      );
 
-      const candidate = mergeChunks(combined, normalized.chunk);
-      if (candidate.content.length > config.maxContentRows) {
-        stopReason = "max-content-rows";
-        break outer;
-      }
-
-      const guarded = tryApplyStorageGuards(candidate, config);
-      if (guarded.stopReason !== undefined) {
-        stopReason = guarded.stopReason;
-        break outer;
-      }
-
-      combined = candidate;
-      showsIncluded += 1;
-      excludedEpisodes.push(...normalized.excludedEpisodes);
-      onProgress({
-        type: "show-included",
-        showId: show.id,
-        showRows: normalized.chunk.content.length,
-        showsIncluded,
-        totalRows: combined.content.length,
-        remainingShows: config.maxShows - showsIncluded,
-        remainingRows: config.maxContentRows - combined.content.length,
-      });
-      if (showsIncluded >= config.maxShows) {
-        stopReason = "max-shows";
-        break outer;
+      for (const result of processed) {
+        if (result.status === "skipped") {
+          showsSkipped.push({ showId: result.showId, reason: result.reason });
+          onProgress({ type: "show-skipped", showId: result.showId, reason: result.reason });
+          continue;
+        }
+        const showRows = result.chunk.content.length;
+        if (totalRows + showRows > config.maxContentRows) {
+          stopReason = "max-content-rows";
+          break outer;
+        }
+        acceptedShows.push(result);
+        totalRows += showRows;
+        onProgress({
+          type: "show-included",
+          showId: result.showId,
+          showRows,
+          showsIncluded: acceptedShows.length,
+          totalRows,
+          remainingShows: config.maxShows - acceptedShows.length,
+          remainingRows: config.maxContentRows - totalRows,
+        });
+        if (acceptedShows.length >= config.maxShows) {
+          stopReason = "max-shows";
+          break outer;
+        }
       }
     }
   }
 
-  if (combined.content.length === 0) {
+  if (acceptedShows.length === 0) {
     throw new Error("TVmaze catalog build produced no complete Show hierarchy.");
   }
-  const generated = applyDeterministicDemoPolicies(combined);
-  const normalizedBytes = calculateArtifactNormalizedBytes(generated.chunk);
-  if (normalizedBytes > config.maxNormalizedArtifactBytes) {
-    throw new Error(
-      `Smallest scenario-capable catalog exceeds normalized artifact guard: ${normalizedBytes} bytes.`,
-    );
-  }
-  const estimatedDatabaseBytes = estimateCatalogDatabaseBytes(
-    generated.chunk,
-    normalizedBytes,
-  );
+  const fitted = fitCompleteShowPrefix(acceptedShows, config);
+  if (fitted.showCount < acceptedShows.length) stopReason = fitted.stopReason;
+  const { generated, normalizedBytes, estimatedDatabaseBytes } = fitted;
   assertEstimatedDatabaseBudget(estimatedDatabaseBytes, config);
   onProgress({
     type: "complete",
@@ -170,13 +147,145 @@ export async function buildCatalogFromTvMaze(
     estimatedDatabaseBytes,
     summary: {
       pagesFetched,
-      showsIncluded,
+      showsIncluded: fitted.showCount,
       showsSkipped,
-      excludedEpisodes: excludedEpisodes.sort((left, right) =>
-        left.sourceId.localeCompare(right.sourceId),
-      ),
+      excludedEpisodes: acceptedShows
+        .slice(0, fitted.showCount)
+        .flatMap((show) => show.excludedEpisodes)
+        .sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
       stopReason,
     },
+  };
+}
+
+interface AcceptedShow {
+  status: "normalized";
+  showId: number;
+  chunk: NormalizedCatalogChunk;
+  excludedEpisodes: ExcludedProviderRecord[];
+}
+
+type ProcessedShow =
+  | AcceptedShow
+  | { status: "skipped"; showId: number; reason: string };
+
+async function processShow(
+  source: TvMazeCatalogSource,
+  show: TvMazeShow,
+  config: CatalogArtifactConfiguration,
+): Promise<ProcessedShow> {
+  if (!isUsableTvMazeShow(show)) {
+    return { status: "skipped", showId: show.id, reason: "INELIGIBLE_SHOW" };
+  }
+  const [seasons, sourceEpisodes] = await Promise.all([
+    source.getShowSeasons(show.id),
+    source.getShowEpisodes(show.id),
+  ]);
+  const normalized = normalizeTvMazeHierarchy({
+    show,
+    seasons: seasons.filter(
+      (season) => Number.isSafeInteger(season.number) && season.number > 0,
+    ),
+    episodes: limitRegularEpisodes(sourceEpisodes, config.maxEpisodesPerShow),
+  });
+  return normalized.status === "skipped"
+    ? { status: "skipped", showId: show.id, reason: normalized.reason }
+    : {
+        status: "normalized",
+        showId: show.id,
+        chunk: normalized.chunk,
+        excludedEpisodes: normalized.excludedEpisodes,
+      };
+}
+
+interface EvaluatedPrefix {
+  showCount: number;
+  generated: GeneratedCatalogPolicies;
+  normalizedBytes: number;
+  estimatedDatabaseBytes: number;
+  stopReason: Extract<
+    CatalogBuildStopReason,
+    "max-normalized-artifact-bytes" | "max-estimated-database-bytes"
+  >;
+}
+
+function fitCompleteShowPrefix(
+  shows: AcceptedShow[],
+  config: CatalogArtifactConfiguration,
+): EvaluatedPrefix {
+  const minimum = shows.findIndex((show) => supportsDemoScenarios(show.chunk)) + 1;
+  if (minimum === 0) {
+    throw new Error(
+      "Catalog cannot provide demo scenarios: no complete Show has the required Season/Episode hierarchy.",
+    );
+  }
+  const evaluate = (showCount: number): Omit<EvaluatedPrefix, "stopReason"> => {
+    const generated = applyDeterministicDemoPolicies(mergeShowChunks(shows, showCount));
+    const normalizedBytes = calculateArtifactNormalizedBytes(generated.chunk);
+    return {
+      showCount,
+      generated,
+      normalizedBytes,
+      estimatedDatabaseBytes: estimateCatalogDatabaseBytes(generated.chunk, normalizedBytes),
+    };
+  };
+  const fits = (candidate: Omit<EvaluatedPrefix, "stopReason">): boolean =>
+    candidate.normalizedBytes <= config.maxNormalizedArtifactBytes &&
+    candidate.estimatedDatabaseBytes <= config.maxEstimatedDatabaseBytes;
+
+  const complete = evaluate(shows.length);
+  if (fits(complete)) {
+    return { ...complete, stopReason: "max-estimated-database-bytes" };
+  }
+  const stopReason = complete.normalizedBytes > config.maxNormalizedArtifactBytes
+    ? "max-normalized-artifact-bytes"
+    : "max-estimated-database-bytes";
+  let low = minimum;
+  let high = shows.length - 1;
+  let best: Omit<EvaluatedPrefix, "stopReason"> | undefined;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const candidate = evaluate(middle);
+    if (fits(candidate)) {
+      best = candidate;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+  if (best === undefined) {
+    const smallest = evaluate(minimum);
+    throw new Error(
+      `Smallest scenario-capable catalog exceeds storage guard: ${smallest.normalizedBytes} normalized bytes, ${smallest.estimatedDatabaseBytes} estimated database bytes.`,
+    );
+  }
+  return { ...best, stopReason };
+}
+
+function supportsDemoScenarios(chunk: NormalizedCatalogChunk): boolean {
+  for (const series of chunk.content.filter((row) => row.type === "SERIES")) {
+    const seasons = chunk.content.filter(
+      (row) => row.type === "SEASON" && row.parentId === series.id,
+    );
+    const episodeCounts = seasons.map(
+      (season) => chunk.content.filter(
+        (row) => row.type === "EPISODE" && row.parentId === season.id,
+      ).length,
+    );
+    return episodeCounts.some((count) => count >= 1) &&
+      episodeCounts.some((count, index) => count >= 2 && episodeCounts.some(
+        (otherCount, otherIndex) => otherIndex !== index && otherCount >= 1,
+      ));
+  }
+  return false;
+}
+
+function mergeShowChunks(shows: AcceptedShow[], count: number): NormalizedCatalogChunk {
+  const selected = shows.slice(0, count);
+  return {
+    content: selected.flatMap((show) => show.chunk.content),
+    geoBlocks: selected.flatMap((show) => show.chunk.geoBlocks),
+    derivedSeasons: selected.flatMap((show) => show.chunk.derivedSeasons),
   };
 }
 
@@ -189,33 +298,6 @@ export function estimateCatalogDatabaseBytes(
       chunk.content.length * 1_200 +
       chunk.geoBlocks.length * 300,
   );
-}
-
-function tryApplyStorageGuards(
-  chunk: NormalizedCatalogChunk,
-  config: CatalogArtifactConfiguration,
-): { stopReason?: CatalogBuildStopReason } {
-  let generated: GeneratedCatalogPolicies;
-  try {
-    generated = applyDeterministicDemoPolicies(chunk);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.startsWith("Catalog cannot provide demo scenarios")
-    ) {
-      return {};
-    }
-    throw error;
-  }
-  const normalizedBytes = calculateArtifactNormalizedBytes(generated.chunk);
-  if (normalizedBytes > config.maxNormalizedArtifactBytes) {
-    return { stopReason: "max-normalized-artifact-bytes" };
-  }
-  const estimate = estimateCatalogDatabaseBytes(generated.chunk, normalizedBytes);
-  if (estimate > config.maxEstimatedDatabaseBytes) {
-    return { stopReason: "max-estimated-database-bytes" };
-  }
-  return {};
 }
 
 function limitRegularEpisodes(
@@ -252,15 +334,4 @@ function limitRegularEpisodes(
       episode.number <= 0 ||
       selectedIds.has(episode.id),
   );
-}
-
-function mergeChunks(
-  left: NormalizedCatalogChunk,
-  right: NormalizedCatalogChunk,
-): NormalizedCatalogChunk {
-  return {
-    content: [...left.content, ...right.content],
-    geoBlocks: [...left.geoBlocks, ...right.geoBlocks],
-    derivedSeasons: [...left.derivedSeasons, ...right.derivedSeasons],
-  };
 }

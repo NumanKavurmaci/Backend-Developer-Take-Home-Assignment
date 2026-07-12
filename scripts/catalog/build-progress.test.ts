@@ -12,6 +12,7 @@ describe("catalog build progress reporting", () => {
         maxContentRows: 1_000,
         tvmazeStartPage: 0,
         maxPages: 2,
+        fetchConcurrency: 16,
         offline: false,
       },
       (message) => messages.push(message),
