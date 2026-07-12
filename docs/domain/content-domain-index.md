@@ -345,7 +345,7 @@ Used in:
 
 Database access layer for content-related operations.
 
-Uses Prisma with SQLite.
+Uses Prisma with PostgreSQL.
 
 Responsibilities:
 
@@ -354,7 +354,7 @@ Responsibilities:
 - Normalize geo-block country codes.
 - Load content with children.
 - Load content with parent.
-- Load full ancestor path using one recursive SQLite query.
+- Load the full ancestor path using one recursive PostgreSQL query.
 - Detect corrupted cyclic or unexpectedly deep hierarchy data.
 
 ## Imports
@@ -549,7 +549,7 @@ For a movie or series, the path contains only that item.
 
 Behavior:
 
-1. Calls internal recursive SQLite CTE function `fetchContentAncestorRows(...)`.
+1. Calls internal recursive PostgreSQL CTE function `fetchContentAncestorRows(...)`.
 2. Checks for cycles with `assertAncestorPathHasNoCycle(...)`.
 3. Checks depth limit with `assertAncestorPathIsWithinDepthLimit(...)`.
 4. Removes helper fields like `depth` and `hasCycle` before returning `Content[]`.
@@ -603,7 +603,7 @@ Returns `undefined` when the list is empty.
 
 ### `fetchContentAncestorRows(prisma, contentId)`
 
-Uses a recursive SQLite CTE to walk upward from requested content to root parent.
+Uses a recursive PostgreSQL CTE to walk upward from requested content to root parent.
 
 Starts from the requested content at depth `0`, then recursively joins parent rows.
 
@@ -904,7 +904,7 @@ HTTP request
   -> Service calls resolveContentMetadata(prisma, contentId)
   -> metadata-inheritance.ts
   -> content-repository.ts getContentAncestorPath(...)
-  -> SQLite recursive CTE loads ancestor path in one query
+  -> PostgreSQL recursive CTE loads ancestor path in one query
   -> metadata-inheritance.ts validates hierarchy
   -> metadata-inheritance.ts loads geo-block countries in one query
   -> metadata-inheritance.ts resolves final metadata
@@ -1008,7 +1008,7 @@ resolveContentMetadata(prisma, contentId);
 
 ## 3. Repository avoids N+1 parent lookup
 
-`getContentAncestorPath(...)` loads the whole parent path with one recursive SQLite CTE.
+`getContentAncestorPath(...)` loads the whole parent path with one recursive PostgreSQL CTE.
 
 This is better than doing:
 

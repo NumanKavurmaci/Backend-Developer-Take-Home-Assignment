@@ -25,7 +25,7 @@ The project implements the core middleware and CMS scheduling concerns from the 
 npm install
 cp .env.example .env
 npm run db:start
-npm run db:migrate:prisma
+npm run db:migrate
 npm run db:seed
 npm run dev
 ```
@@ -79,12 +79,25 @@ npm run db:destroy
 | `npm run db:start` | Start PostgreSQL 18 and wait until it is healthy |
 | `npm run db:stop` | Stop local PostgreSQL and preserve its data |
 | `npm run db:destroy` | Stop PostgreSQL and delete its local named volume |
-| `npm run db:reset` | Recreate the database; remains SQLite-specific until PG-05 |
+| `npm run db:setup` | Generate Prisma Client and run development migrations |
+| `npm run db:migrate` | Create/apply migrations locally with `prisma migrate dev` |
+| `npm run db:migrate:deploy` | Apply committed migrations in CI or production without seeding |
+| `npm run db:reset` | **Destructively** reset and reseed a local/test database; never use in production |
 | `npm run db:seed` | Insert repeatable sample data |
 | `npm run db:test` | Run the disposable test database checks and DB-backed domain tests |
 | `npm run typecheck` | Run TypeScript checks |
 | `npm test` | Run the automated test suite against a disposable test database |
 | `npm run test:coverage` | Run the automated test suite with the 90% line coverage gate |
+
+Use `db:migrate` only during development. CI and production deployments use
+`db:migrate:deploy`, which applies committed migrations without resetting data
+or running the seed script. Application startup never migrates, resets, or
+seeds the database automatically.
+
+`db:reset` is destructive and is restricted to local development or the
+disposable test database. Prisma runs the configured seed script after a
+successful reset. Sample data for a local or demo environment is created only
+through a separate, explicit `db:seed` operation.
 
 ## API Surface
 

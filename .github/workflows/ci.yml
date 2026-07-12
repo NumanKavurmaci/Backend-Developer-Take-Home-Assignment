@@ -12,7 +12,21 @@ jobs:
     name: Quality gate
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: file:../data/test.db
+      DATABASE_URL: postgresql://saatcms:saatcms_ci@localhost:5432/saatcms_test?schema=public
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: saatcms_test
+          POSTGRES_USER: saatcms
+          POSTGRES_PASSWORD: saatcms_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U saatcms -d saatcms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout
@@ -29,6 +43,9 @@ jobs:
 
       - name: Generate Prisma client
         run: npm run db:generate
+
+      - name: Apply PostgreSQL migrations
+        run: npm run db:migrate:deploy
 
       - name: Verify disposable test database
         run: npm run db:test

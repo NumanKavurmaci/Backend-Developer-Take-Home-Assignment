@@ -272,7 +272,7 @@ Start PostgreSQL and apply migrations:
 
 ```bash
 npm run db:start
-npm run db:migrate:prisma
+npm run db:migrate
 ```
 
 Load sample data:
@@ -292,7 +292,7 @@ Fully reset the local PostgreSQL databases and reapply migrations:
 ```bash
 npm run db:destroy
 npm run db:start
-npm run db:migrate:prisma
+npm run db:migrate
 ```
 
 This deletes local development and test data.

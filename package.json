@@ -15,12 +15,13 @@
     "db:start": "docker compose up -d --wait",
     "db:stop": "docker compose down",
     "db:destroy": "docker compose down --volumes --remove-orphans",
-    "db:setup": "tsx scripts/db-setup.ts",
+    "db:setup": "npm run db:generate && npm run db:migrate",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
-    "db:migrate": "tsx scripts/db-setup.ts",
-    "db:migrate:prisma": "prisma migrate dev",
-    "db:reset": "tsx scripts/db-setup.ts --reset",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:prisma": "npm run db:migrate",
+    "db:reset": "prisma migrate reset",
     "db:test": "vitest run src/test/test-database.test.ts src/db/database-constraints.test.ts src/content/content-hierarchy.test.ts src/live-channel/live-channel.test.ts",
     "db:studio": "prisma studio",
     "db:check": "tsx src/db/check.ts"
@@ -38,10 +39,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
-    "@types/sql.js": "^1.4.11",
     "@vitest/coverage-v8": "^4.1.9",
     "prisma": "5.22.0",
-    "sql.js": "^1.14.1",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"

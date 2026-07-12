@@ -87,7 +87,7 @@ commit transaction
 
 Concurrent writes for the same channel touch the same schedule-lock row. That makes the critical flow run one after another, so the second request sees the first request's inserted program before it can save a conflicting schedule.
 
-Different channels use different schedule-lock rows. This keeps the application strategy channel-scoped instead of using one global EPG lock. SQLite may still serialize writes broadly internally, but the model expresses the intended per-channel strategy clearly.
+Different channels use different schedule-lock rows. This keeps the application strategy channel-scoped instead of using one global EPG lock, allowing unrelated channel schedules to proceed independently.
 
 ## Success Response
 
