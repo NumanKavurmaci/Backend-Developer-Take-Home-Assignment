@@ -29,6 +29,9 @@ model Content {
   geoBlockCountriesOverride Boolean                  @default(false)
   geoBlockCountries         ContentGeoBlockCountry[]
 
+  /// Optional real-world catalog metadata kept separate from inheritable OTT rules.
+  catalogMetadata CatalogMetadata?
+
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
@@ -45,6 +48,57 @@ model ContentGeoBlockCountry {
 
   @@id([contentId, countryCode])
   @@index([countryCode])
+}
+
+/// Rich source metadata imported from open catalog providers.
+/// This is deliberately separate from Content so source facts do not become
+/// inheritable playback rules by accident.
+model CatalogMetadata {
+  contentId String @id
+
+  source    String
+  sourceId  String
+  sourceUrl String?
+
+  originalTitle   String?
+  summary         String?  @db.Text
+  language        String?
+  status          String?
+  countryCode     String?
+  networkName     String?
+  officialSiteUrl String?
+  imageUrl        String?
+
+  premieredAt   DateTime? @db.Date
+  endedAt       DateTime? @db.Date
+  runtimeMinutes Int?
+  seasonNumber   Int?
+  episodeNumber  Int?
+  ratingAverage  Float?
+
+  genres         String[] @default([])
+  sourceMetadata Json?
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([source, sourceId])
+  @@index([source])
+  @@index([premieredAt])
+  @@index([seasonNumber, episodeNumber])
+}
+
+/// Provenance and capacity report for the latest advanced catalog seed.
+model CatalogSeedManifest {
+  id                     String   @id
+  generatedAt            DateTime @default(now()) @db.Timestamptz(3)
+  sources                Json
+  configuration          Json
+  counts                 Json
+  normalizedBytes        BigInt
+  estimatedDatabaseBytes BigInt
 }
 
 model LiveChannel {
