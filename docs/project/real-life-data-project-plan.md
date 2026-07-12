@@ -276,15 +276,18 @@ Transform TVmaze Shows, Seasons, and Episodes into flattened `Content` rows. Pre
 
 ---
 
-## RLD-06 - Generate Deterministic SaatCMS Playback Policies
+## RLD-06 - Generate Minimal Deterministic Demo Policies
 
 ### Story Points
 
-**5 points**
+**3 points**
 
 ### Description
 
-Real-life providers do not own SaatCMS commercial rules. Generate the existing assignment-specific values deterministically from stable source identities so the real catalog still demonstrates inheritance, geo-blocking, and device restriction.
+TVmaze supplies catalog facts, not SaatCMS playback rules. Add only the small
+set of deterministic mock policies needed to demonstrate the existing
+assignment behavior: metadata inheritance, geo-blocking, and premium 4K device
+restriction. This is a middleware demonstration, not a real IPTV service.
 
 Policies include:
 
@@ -292,35 +295,42 @@ Policies include:
 - inheritable `genre`
 - `quality`
 - `isPremium`
-- `playbackUrl`
+- `playbackUrl` as a non-playable placeholder only
 - `geoBlockCountriesOverride`
 - `ContentGeoBlockCountry` rows
 
-Series should normally own defaults, selected Seasons should override selected fields, and selected Episodes should provide explicit overrides. The generator must guarantee known examples for inherited metadata, Season override, Episode override, geo-blocking, empty geo override, allowed playback, and premium 4K Mobile blocking.
+Series own simple defaults. A few deterministically selected Seasons and
+Episodes provide the overrides needed by the tests. Playback references use the
+reserved `.invalid` domain, are returned only as mock authorization results,
+and are never fetched or checked as media.
+
+Out of scope: real streams, IPTV playlists, signed URLs, credentials, DRM,
+media hosting, stream availability checks, and provider-specific commercial
+rules.
 
 ### Acceptance Criteria
 
 - Policy generation is deterministic and independent of generation time or row order.
 - Provider catalog facts are never mislabeled as provider-supplied OTT policies.
-- Series rows provide sufficient defaults for descendant inheritance.
-- A bounded deterministic subset of Seasons and Episodes overrides policy fields.
-- Playback URLs use a clearly fictional, non-production host and are never fetched during generation or tests.
+- Series rows provide the defaults needed for descendant inheritance.
+- Only the small deterministic set of Seasons and Episodes required for demo scenarios receives overrides.
+- Playback URLs are placeholder values under `https://media.invalid/` and are never fetched or validated as streams.
 - Generated country codes are valid ISO-3166 alpha-2 codes.
-- The catalog contains at least one stable example for every assignment scenario.
-- Useful scenario IDs are written into the artifact manifest and used by verification, docs, Postman, and deployment smoke tests.
+- The catalog contains stable examples for inheritance, a Season override, an Episode override, geo-blocking, an empty geo override, allowed playback, and premium 4K Mobile blocking.
+- Those scenario Content IDs are written into the artifact manifest for tests and verification.
 - Existing playback authorization logic does not require provider-specific conditions.
 
 ### Tests Required
 
-- Same-source-ID test always generates the same policies.
-- Different-source-ID fixture test exercises expected policy variation.
+- Repeated generation produces the same policies and scenario IDs.
 - Inherited Episode scenario resolves Series defaults.
 - Season override scenario resolves the Season value.
 - Episode override scenario resolves the Episode value.
 - Empty geo override scenario clears an inherited block list.
 - Geo-blocked scenario returns `GEO_BLOCKED`.
 - Premium 4K Mobile scenario returns `DEVICE_NOT_SUPPORTED` while Web and SmartTV succeed.
-- Policy validation rejects invalid quality, country, hierarchy, or playback values.
+- Allowed playback returns a `.invalid` placeholder without making a network request.
+- Policy validation rejects invalid quality, country, hierarchy, or non-placeholder playback values.
 
 ---
 
@@ -688,7 +698,7 @@ Story points use the Fibonacci scale and represent relative implementation compl
 | RLD-03    | Import contracts and deterministic IDs |      5 |
 | RLD-04    | Cached local-only source client        |      5 |
 | RLD-05    | TVmaze hierarchy normalization         |      8 |
-| RLD-06    | Deterministic SaatCMS policies         |      5 |
+| RLD-06    | Minimal deterministic demo policies    |      3 |
 | RLD-07    | Versioned content data artifact        |      8 |
 | RLD-08    | Safe batched PostgreSQL loader         |     13 |
 | RLD-09    | Replace fictional seed workflow        |      5 |
@@ -698,7 +708,7 @@ Story points use the Fibonacci scale and represent relative implementation compl
 | RLD-13    | Application tests and fixtures         |      8 |
 | RLD-14    | Local-to-Render import procedure       |      5 |
 | RLD-15    | Documentation and attribution          |      3 |
-| **Total** |                                        | **93** |
+| **Total** |                                        | **91** |
 
 RLD-08 has the highest estimate because it combines destructive-operation safety, streaming and batching, hierarchy ordering, repeatability, failure recovery, Render target protection, and storage-limit enforcement. RLD-05, RLD-07, RLD-10, RLD-12, and RLD-13 carry additional uncertainty around provider data quality, artifact integrity, the raw recursive SQL mapping, production-size validation, and regression coverage.
 

@@ -84,6 +84,9 @@ export interface CatalogCounts {
 export interface CatalogScenarioIds {
   inheritedEpisodeId?: string;
   seasonOverrideEpisodeId?: string;
+  episodeOverrideEpisodeId?: string;
+  emptyGeoOverrideEpisodeId?: string;
+  allowedPlaybackContentId?: string;
   premium4kEpisodeId?: string;
   geoBlockedContentId?: string;
 }
