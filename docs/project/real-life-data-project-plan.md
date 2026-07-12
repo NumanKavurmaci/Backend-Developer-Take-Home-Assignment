@@ -377,6 +377,53 @@ data/catalog/
 
 ---
 
+## RLD-07A - Assemble the Local Catalog Build Command
+
+### Story Points
+
+**5 points**
+
+### Description
+
+Connect the completed source client, TVmaze hierarchy normalization, demo
+policies, storage guards, artifact writer, and artifact validator behind one
+explicit local command:
+
+```text
+npm run catalog:build
+```
+
+This is the only command that contacts TVmaze. It must support small rehearsals,
+offline cache replay, bounded generation, and a clear summary so the generated
+rows and artifact measurements can be inspected before database loading begins.
+
+### Acceptance Criteria
+
+- Show-index, Season, and Episode endpoints are fetched through the cached, paced TVmaze client.
+- Provider responses are decoded and rejected safely when malformed.
+- Build configuration supports cache/output paths, offline mode, start page, page limit, and all RLD-01 limits.
+- Shows are processed deterministically and complete Show hierarchies are never split to satisfy a row limit.
+- Episodes per Show, total Content rows, normalized artifact bytes, and estimated database bytes remain guarded.
+- Normalization skips and excluded Episodes are summarized with explicit reasons.
+- Demo policies and scenario IDs are applied before artifact checksums are calculated.
+- The completed artifact is validated without a database before the command succeeds.
+- Interrupted runs remain resumable from the HTTP cache and never publish a partial target directory.
+- The command prints counts, sizes, stop reason, skipped records, and output location without secrets.
+- No build command runs during application startup, migrations, CI, or Render deployment.
+
+### Tests Required
+
+- Endpoint test covers Show pages, Seasons, Episodes, cache keys, and 404 end-of-index behavior.
+- Malformed provider response test fails safely.
+- Small offline cached build produces a valid artifact without network access.
+- Row-boundary test accepts a complete Show at the limit and stops before splitting the next Show.
+- Episode-per-Show test caps imported Episodes deterministically.
+- Shuffled provider-response test produces identical artifact checksums.
+- Build summary test reports included, skipped, excluded, and budget-stop counts.
+- End-to-end rehearsal fetches a small live TVmaze sample, writes an artifact, and passes `catalog:validate`.
+
+---
+
 ## RLD-08 - Implement a Safe Batched PostgreSQL Catalog Loader
 
 ### Story Points
@@ -700,6 +747,7 @@ Story points use the Fibonacci scale and represent relative implementation compl
 | RLD-05    | TVmaze hierarchy normalization         |      8 |
 | RLD-06    | Minimal deterministic demo policies    |      3 |
 | RLD-07    | Versioned content data artifact        |      8 |
+| RLD-07A   | Local catalog build command            |      5 |
 | RLD-08    | Safe batched PostgreSQL loader         |     13 |
 | RLD-09    | Replace fictional seed workflow        |      5 |
 | RLD-10    | Repository and inheritance updates     |      8 |
@@ -708,7 +756,7 @@ Story points use the Fibonacci scale and represent relative implementation compl
 | RLD-13    | Application tests and fixtures         |      8 |
 | RLD-14    | Local-to-Render import procedure       |      5 |
 | RLD-15    | Documentation and attribution          |      3 |
-| **Total** |                                        | **91** |
+| **Total** |                                        | **96** |
 
 RLD-08 has the highest estimate because it combines destructive-operation safety, streaming and batching, hierarchy ordering, repeatability, failure recovery, Render target protection, and storage-limit enforcement. RLD-05, RLD-07, RLD-10, RLD-12, and RLD-13 carry additional uncertainty around provider data quality, artifact integrity, the raw recursive SQL mapping, production-size validation, and regression coverage.
 
@@ -768,6 +816,8 @@ RLD-02 -- RLD-03
   |       RLD-06
   |         |
   +-------RLD-07
+            |
+          RLD-07A
             |
           RLD-08
             |

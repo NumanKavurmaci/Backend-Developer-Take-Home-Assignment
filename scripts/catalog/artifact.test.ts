@@ -37,7 +37,12 @@ function options(generatedAt = "2026-07-12T20:00:00.000Z"): WriteCatalogArtifact
       attribution: "Data provided by TVmaze",
       snapshotKey: "fixture-20260712",
     }],
-    configuration: { ...DEFAULT_CATALOG_LIMITS },
+    configuration: {
+      ...DEFAULT_CATALOG_LIMITS,
+      tvmazeStartPage: 0,
+      maxPages: 1,
+      offline: true,
+    },
     scenarioIds: applyDeterministicDemoPolicies(policyFixtureChunk()).scenarioIds,
     estimatedDatabaseBytes: 1_000_000,
   };
@@ -77,7 +82,12 @@ describe("versioned catalog artifact", () => {
       generator: { name: "saatcms-tvmaze-catalog", version: "0.1.0" },
       generatedAt: "2026-07-12T20:00:00.000Z",
       provenance: [{ providerName: "TVmaze", license: "CC BY-SA" }],
-      configuration: DEFAULT_CATALOG_LIMITS,
+      configuration: {
+        ...DEFAULT_CATALOG_LIMITS,
+        tvmazeStartPage: 0,
+        maxPages: 1,
+        offline: true,
+      },
       scenarioIds: {
         inheritedEpisodeId: "tvmaze-episode-101",
         premium4kEpisodeId: "tvmaze-episode-202",

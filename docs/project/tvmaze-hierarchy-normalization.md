@@ -21,7 +21,8 @@ the Episode; an orphan Episode is never emitted.
 
 ## Episode inclusion
 
-Only Episodes whose TVmaze `type` is `regular` and whose season and episode
+Only positive-numbered TVmaze Season records are eligible; Season `0` is
+treated as a specials container and excluded. Only Episodes whose TVmaze `type` is `regular` and whose season and episode
 numbers are positive integers are included. Specials, null-numbered Episodes,
 and non-positive-numbered Episodes are excluded and recorded with reason
 `SPECIAL_OR_UNNUMBERED_EPISODE`. The normal TVmaze episodes endpoint already

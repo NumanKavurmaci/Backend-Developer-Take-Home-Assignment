@@ -23,8 +23,8 @@ import {
   type ArtifactFileManifest,
   type ArtifactGeoBlockRow,
   type CatalogArtifactManifest,
+  type CatalogArtifactConfiguration,
 } from "./artifact-types.js";
-import type { CatalogLimits } from "./config.js";
 import { assertEstimatedDatabaseBudget } from "./budget.js";
 import type {
   CatalogScenarioIds,
@@ -38,7 +38,7 @@ export interface WriteCatalogArtifactOptions {
   generatedAt: string;
   generatorVersion: string;
   provenance: CatalogSourceProvenance[];
-  configuration: CatalogLimits;
+  configuration: CatalogArtifactConfiguration;
   scenarioIds: CatalogScenarioIds;
   estimatedDatabaseBytes: number;
 }
@@ -107,7 +107,7 @@ export async function writeCatalogArtifact(
       `${stableStringify(manifest, 2)}\n`,
       { encoding: "utf8", flag: "wx", mode: 0o600 },
     );
-    await rename(staging, output);
+    await renameWithTransientRetries(staging, output);
     return manifest;
   } catch (error) {
     await rm(staging, { recursive: true, force: true });
@@ -147,6 +147,25 @@ export function flattenContentRow(row: NormalizedContentRow): ArtifactContentRow
     genres: [...row.sourceFacts.genres],
     sourceMetadata: structuredClone(row.sourceFacts.sourceMetadata),
   };
+}
+
+export function calculateArtifactNormalizedBytes(
+  chunk: NormalizedCatalogChunk,
+): number {
+  const contentBytes = [...chunk.content]
+    .sort(compareNormalizedContent)
+    .map(flattenContentRow)
+    .reduce(
+      (total, row) => total + Buffer.byteLength(`${stableStringify(row)}\n`, "utf8"),
+      0,
+    );
+  const geoBlockBytes = [...chunk.geoBlocks]
+    .sort(compareGeoBlocks)
+    .reduce(
+      (total, row) => total + Buffer.byteLength(`${stableStringify(row)}\n`, "utf8"),
+      0,
+    );
+  return contentBytes + geoBlockBytes;
 }
 
 async function writeNdjsonGzip<T>(
@@ -251,4 +270,19 @@ async function assertPathDoesNotExist(filePath: string): Promise<void> {
     return;
   }
   throw new Error(`Refusing to replace an existing catalog artifact directory: ${filePath}.`);
+}
+
+async function renameWithTransientRetries(source: string, target: string): Promise<void> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    try {
+      await rename(source, target);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (!(["EPERM", "EBUSY"] as const).includes(code as "EPERM" | "EBUSY") || attempt === 5) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100 * 2 ** attempt));
+    }
+  }
 }

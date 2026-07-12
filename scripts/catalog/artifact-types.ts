@@ -9,6 +9,12 @@ import type {
 } from "./types.js";
 import type { CatalogLimits } from "./config.js";
 
+export interface CatalogArtifactConfiguration extends CatalogLimits {
+  tvmazeStartPage: number;
+  maxPages: number;
+  offline: boolean;
+}
+
 export const CATALOG_ARTIFACT_SCHEMA_VERSION = 1 as const;
 export const CATALOG_GENERATOR_NAME = "saatcms-tvmaze-catalog" as const;
 export const CONTENT_ARTIFACT_FILE = "content.ndjson.gz" as const;
@@ -68,7 +74,7 @@ export interface CatalogArtifactManifest {
   };
   generatedAt: string;
   provenance: CatalogSourceProvenance[];
-  configuration: CatalogLimits;
+  configuration: CatalogArtifactConfiguration;
   counts: CatalogCounts;
   scenarioIds: CatalogScenarioIds;
   derivedSeasons: DerivedSeasonIdentity[];
