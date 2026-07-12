@@ -4,6 +4,7 @@ import {
   assertUsingTestDatabase,
   clearContentTables,
   clearLiveChannelTables,
+  configureTestDatabaseUrl,
 } from "./test-database.js";
 
 const prisma = new PrismaClient();
@@ -13,6 +14,26 @@ afterAll(async () => {
 });
 
 describe("test database safety guard", () => {
+  it("preserves a DATABASE_URL supplied by CI", async () => {
+    const originalDatabaseUrl = process.env.DATABASE_URL;
+    const ciDatabaseUrl =
+      "postgresql://saatcms:saatcms_ci@localhost:5432/saatcms_test?schema=public";
+
+    try {
+      process.env.DATABASE_URL = ciDatabaseUrl;
+
+      await configureTestDatabaseUrl();
+
+      expect(process.env.DATABASE_URL).toBe(ciDatabaseUrl);
+    } finally {
+      if (originalDatabaseUrl === undefined) {
+        delete process.env.DATABASE_URL;
+      } else {
+        process.env.DATABASE_URL = originalDatabaseUrl;
+      }
+    }
+  });
+
   it("accepts the dedicated disposable test database", () => {
     expect(() =>
       assertUsingTestDatabase(

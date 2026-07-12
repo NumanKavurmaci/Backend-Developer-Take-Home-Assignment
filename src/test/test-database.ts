@@ -19,17 +19,17 @@ export async function readTestDatabaseUrl(): Promise<string> {
 }
 
 export async function configureTestDatabaseUrl(): Promise<void> {
-  process.env.DATABASE_URL = await readTestDatabaseUrl();
+  process.env.DATABASE_URL ??= await readTestDatabaseUrl();
 }
 
 export async function recreateTestDatabase(): Promise<void> {
-  const databaseUrl = await readTestDatabaseUrl();
+  const databaseUrl = await getTestDatabaseUrl();
   assertUsingTestDatabase(databaseUrl);
   await resetTestDatabase(databaseUrl);
 }
 
 export async function removeTestDatabase(): Promise<void> {
-  const databaseUrl = await readTestDatabaseUrl();
+  const databaseUrl = await getTestDatabaseUrl();
   assertUsingTestDatabase(databaseUrl);
   await resetTestDatabase(databaseUrl);
 }
@@ -98,6 +98,10 @@ async function readDatabaseUrlFromEnvFile(fileName: string): Promise<string> {
   }
 
   return databaseUrl;
+}
+
+async function getTestDatabaseUrl(): Promise<string> {
+  return process.env.DATABASE_URL ?? readTestDatabaseUrl();
 }
 
 async function resetTestDatabase(databaseUrl: string): Promise<void> {
