@@ -75,12 +75,7 @@ export function assertUsingTestDatabase(
   const isTestDatabase = parsedUrl.pathname === "/saatcms_test";
   const isTestEnvironment = nodeEnvironment === "test";
 
-  if (
-    !isPostgreSql ||
-    !isLocalHost ||
-    !isTestDatabase ||
-    !isTestEnvironment
-  ) {
+  if (!isPostgreSql || !isLocalHost || !isTestDatabase || !isTestEnvironment) {
     throw new Error(
       "Refusing to run destructive test cleanup outside the local saatcms_test PostgreSQL database in NODE_ENV=test.",
     );
