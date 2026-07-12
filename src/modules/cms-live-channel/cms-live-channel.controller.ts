@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { ApiError } from "../../shared/http/api-error.js";
+import { setCmsAuditResource } from "../../shared/http/cms-security.js";
 import { CmsLiveChannelService } from "./cms-live-channel.service.js";
 
 export class CmsLiveChannelController {
@@ -7,6 +8,7 @@ export class CmsLiveChannelController {
 
   async createChannel(c: Context) {
     const channel = await this.service.createChannel(await readJsonBody(c));
+    setCmsAuditResource(c, channel.id);
     return c.json(channel, 201);
   }
 

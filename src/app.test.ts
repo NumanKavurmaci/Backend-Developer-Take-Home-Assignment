@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { createApp } from "./app.js";
 import { HealthController } from "./modules/health/health.controller.js";
 import { ApiError } from "./shared/http/api-error.js";
+import type { CmsSecurityOptions } from "./shared/http/cms-security.js";
 import {
   requestObservabilityMiddleware,
   setRequestLogger,
@@ -230,5 +231,53 @@ describe("Hono app scaffold", () => {
       message: "Short and stout",
     });
     expect(response.status).toBe(418);
+  });
+
+  it("protects the integrated CMS routes when authentication is not configured", async () => {
+    const response = await createApp({
+      cmsSecurity: {
+        credentials: [],
+        authenticationAttemptLimitPerMinute: 10,
+        maxBodyBytes: 1024,
+        rateLimitPerMinute: 10,
+      },
+    }).request("/api/v1/cms/content");
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "CMS_AUTH_NOT_CONFIGURED",
+      message: "CMS authentication is not configured.",
+    });
+    expect(response.status).toBe(503);
+  });
+
+  it("applies role authorization before CMS controllers run", async () => {
+    const cmsSecurity: CmsSecurityOptions = {
+      credentials: [
+        {
+          actorId: "app-test-reader",
+          role: "reader",
+          secret: "app-test-reader-secret",
+        },
+      ],
+      authenticationAttemptLimitPerMinute: 10,
+      maxBodyBytes: 1024,
+      rateLimitPerMinute: 10,
+    };
+    const response = await createApp({ cmsSecurity }).request(
+      "/api/v1/cms/channels",
+      {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer app-test-reader-secret",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Must Not Run", slug: "must-not-run" }),
+      },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      errorCode: "CMS_FORBIDDEN",
+    });
+    expect(response.status).toBe(403);
   });
 });

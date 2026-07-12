@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { ApiError } from "../../shared/http/api-error.js";
+import { setCmsAuditResource } from "../../shared/http/cms-security.js";
 import { CmsEpgProgramService } from "./cms-epg-program.service.js";
 
 // Handles HTTP details: route params, JSON parsing, status codes, and responses.
@@ -14,6 +15,7 @@ export class CmsEpgProgramController {
       body,
     );
 
+    setCmsAuditResource(c, program.id, channelId);
     return c.json(program, 201);
   }
 

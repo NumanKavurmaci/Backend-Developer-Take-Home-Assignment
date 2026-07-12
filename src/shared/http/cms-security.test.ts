@@ -1,10 +1,11 @@
 import { Hono } from "hono";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DomainError } from "../domain/domain-error.js";
 import {
   parseCmsCredentials,
   readCmsSecurityOptions,
   registerCmsSecurity,
+  setCmsAuditResource,
   setCmsAuditLogger,
   type CmsAuditEntry,
   type CmsSecurityOptions,
@@ -12,9 +13,9 @@ import {
 import { errorHandler } from "./error-handler.js";
 import { requestObservabilityMiddleware } from "./request-observability.js";
 
-const readerToken = "reader-secret-123456";
-const editorToken = "editor-secret-123456";
-const adminToken = "admin-secret-1234567";
+const readerToken = "reader-secret-12345678901234567890";
+const editorToken = "editor-secret-12345678901234567890";
+const adminToken = "admin-secret-123456789012345678901";
 
 const securityOptions: CmsSecurityOptions = {
   credentials: [
@@ -22,6 +23,7 @@ const securityOptions: CmsSecurityOptions = {
     { actorId: "editor-user", role: "editor", secret: editorToken },
     { actorId: "admin-user", role: "admin", secret: adminToken },
   ],
+  authenticationAttemptLimitPerMinute: 20,
   maxBodyBytes: 128,
   rateLimitPerMinute: 10,
 };
@@ -37,37 +39,45 @@ describe("CMS security configuration", () => {
   it("parses actor, role, and secrets while preserving colons in secrets", () => {
     expect(
       parseCmsCredentials(
-        "operator:editor:secret-with:colon-123, supervisor:admin:admin-secret-123456",
+        "operator:editor:secret-with:colon-1234567890123456, supervisor:admin:admin-secret-12345678901234567890",
       ),
     ).toEqual([
       {
         actorId: "operator",
         role: "editor",
-        secret: "secret-with:colon-123",
+        secret: "secret-with:colon-1234567890123456",
       },
       {
         actorId: "supervisor",
         role: "admin",
-        secret: "admin-secret-123456",
+        secret: "admin-secret-12345678901234567890",
       },
     ]);
   });
 
   it("rejects malformed, duplicate, and weak credentials", () => {
-    expect(() => parseCmsCredentials("operator:owner:long-secret-12345")).toThrow(
+    expect(() => parseCmsCredentials("operator:owner:long-secret-12345678901234567890")).toThrow(
       /reader\|editor\|admin/,
     );
     expect(() => parseCmsCredentials("operator:editor:short")).toThrow(
-      /at least 16/,
+      /at least 32/,
+    );
+    expect(() => parseCmsCredentials("operator:reader:reader-secret-12345678901234567890,")).toThrow(
+      /empty entries/,
     );
     expect(() =>
       parseCmsCredentials(
-        "operator:reader:reader-secret-12345,operator:admin:admin-secret-123456",
+        "operator:reader:reader-secret-12345678901234567890,operator:admin:admin-secret-123456789012345678901",
       ),
-    ).toThrow(/actor IDs must be unique/);
+    ).toThrow(/same role/);
+    expect(
+      parseCmsCredentials(
+        "operator:editor:first-rotated-secret-123456789012,operator:editor:second-rotated-secret-12345678901",
+      ),
+    ).toHaveLength(2);
     expect(() =>
       parseCmsCredentials(
-        "first:reader:shared-secret-12345,second:admin:shared-secret-12345",
+        "first:reader:shared-secret-1234567890123456789,second:admin:shared-secret-1234567890123456789",
       ),
     ).toThrow(/secrets must be unique/);
   });
@@ -75,6 +85,7 @@ describe("CMS security configuration", () => {
   it("uses bounded defaults and rejects invalid numeric settings", () => {
     expect(readCmsSecurityOptions({})).toMatchObject({
       credentials: [],
+      authenticationAttemptLimitPerMinute: 300,
       maxBodyBytes: 1024 * 1024,
       rateLimitPerMinute: 120,
     });
@@ -84,6 +95,12 @@ describe("CMS security configuration", () => {
     expect(() =>
       readCmsSecurityOptions({ CMS_RATE_LIMIT_PER_MINUTE: "1.5" }),
     ).toThrow(/CMS_RATE_LIMIT_PER_MINUTE/);
+    expect(() =>
+      readCmsSecurityOptions({ CMS_RATE_LIMIT_PER_MINUTE: "1e3" }),
+    ).toThrow(/positive decimal integer/);
+    expect(() =>
+      readCmsSecurityOptions({ CMS_MAX_BODY_BYTES: "10485761" }),
+    ).toThrow(/at most/);
   });
 });
 
@@ -110,6 +127,8 @@ describe("CMS authentication and authorization", () => {
 
     expect(missing.status).toBe(401);
     expect(invalid.status).toBe(401);
+    expect(missing.headers.get("WWW-Authenticate")).toBe('Bearer realm="cms"');
+    expect(invalid.headers.get("WWW-Authenticate")).toContain("invalid_token");
     await expect(missing.json()).resolves.toMatchObject({
       errorCode: "CMS_AUTHENTICATION_REQUIRED",
     });
@@ -196,12 +215,46 @@ describe("CMS authentication and authorization", () => {
       errorCode: "REQUEST_BODY_TOO_LARGE",
     });
   });
+
+  it("applies the body limit before authentication", async () => {
+    const response = await createSecurityTestApp().request(
+      "/api/v1/cms/content",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: "x".repeat(256) }),
+      },
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({
+      errorCode: "REQUEST_BODY_TOO_LARGE",
+    });
+  });
+
+  it("rate limits repeated unauthenticated attempts by client address", async () => {
+    const app = createSecurityTestApp({
+      ...securityOptions,
+      authenticationAttemptLimitPerMinute: 1,
+    });
+    const headers = { "X-Real-IP": "192.0.2.10" };
+
+    expect((await app.request("/api/v1/cms/content", { headers })).status).toBe(401);
+    const limited = await app.request("/api/v1/cms/content", { headers });
+
+    expect(limited.status).toBe(429);
+    await expect(limited.json()).resolves.toMatchObject({
+      errorCode: "CMS_RATE_LIMITED",
+    });
+  });
 });
 
 describe("CMS mutation auditing", () => {
   it("records successful and rejected mutations without payloads or tokens", async () => {
     const entries: CmsAuditEntry[] = [];
-    restoreAuditLogger = setCmsAuditLogger((entry) => entries.push(entry));
+    restoreAuditLogger = setCmsAuditLogger((entry) => {
+      entries.push(entry);
+    });
     const app = createSecurityTestApp();
 
     await app.request("/api/v1/cms/content/content-1", {
@@ -244,6 +297,45 @@ describe("CMS mutation auditing", () => {
     expect(JSON.stringify(entries)).not.toContain(editorToken);
     expect(JSON.stringify(entries)).not.toContain("payload");
   });
+
+  it("records server-generated resource IDs and parent context", async () => {
+    const entries: CmsAuditEntry[] = [];
+    restoreAuditLogger = setCmsAuditLogger((entry) => {
+      entries.push(entry);
+    });
+
+    const response = await createSecurityTestApp().request(
+      "/api/v1/cms/channels/channel-1/epg",
+      { method: "POST", headers: bearer(editorToken) },
+    );
+
+    expect(response.status).toBe(201);
+    expect(entries[0]).toMatchObject({
+      resourceType: "epg_program",
+      resourceId: "created-program",
+      parentResourceId: "channel-1",
+      outcome: "succeeded",
+    });
+  });
+
+  it("does not turn a committed success into a failure when the audit sink throws", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    restoreAuditLogger = setCmsAuditLogger(() => {
+      throw new Error("audit collector unavailable");
+    });
+
+    try {
+      const response = await createSecurityTestApp().request(
+        "/api/v1/cms/content",
+        { method: "POST", headers: bearer(editorToken) },
+      );
+
+      expect(response.status).toBe(201);
+      expect(errorSpy).toHaveBeenCalledOnce();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
 
 function createSecurityTestApp(
@@ -255,12 +347,19 @@ function createSecurityTestApp(
   app.onError(errorHandler);
   registerCmsSecurity(app, options);
   app.get("/api/v1/cms/content", (c) => c.json({ items: [] }));
-  app.post("/api/v1/cms/content", (c) => c.json({ id: "created" }, 201));
+  app.post("/api/v1/cms/content", (c) => {
+    setCmsAuditResource(c, "created");
+    return c.json({ id: "created" }, 201);
+  });
   app.patch("/api/v1/cms/content/:id", (c) => c.json({ id: c.req.param("id") }));
   app.delete("/api/v1/cms/channels/:channelId", (c) => c.body(null, 204));
   app.delete("/api/v1/cms/channels/:channelId/epg/:programId", (c) =>
     c.body(null, 204),
   );
+  app.post("/api/v1/cms/channels/:channelId/epg", (c) => {
+    setCmsAuditResource(c, "created-program", c.req.param("channelId"));
+    return c.json({ id: "created-program" }, 201);
+  });
   app.post("/api/v1/cms/rejected-domain", () => {
     throw new DomainError(
       "CONTENT_HAS_CHILDREN",

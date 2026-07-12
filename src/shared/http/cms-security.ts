@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Context, Hono, MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
@@ -19,12 +19,13 @@ export type CmsPrincipal = {
   role: CmsRole;
 };
 
-type CmsCredential = CmsPrincipal & {
+export type CmsCredential = CmsPrincipal & {
   secret: string;
 };
 
 export type CmsSecurityOptions = {
   credentials: CmsCredential[];
+  authenticationAttemptLimitPerMinute: number;
   maxBodyBytes: number;
   rateLimitPerMinute: number;
 };
@@ -38,6 +39,7 @@ export type CmsAuditEntry = {
   action: "create" | "read" | "update" | "delete";
   resourceType: "content" | "live_channel" | "epg_program" | "cms_route";
   resourceId?: string;
+  parentResourceId?: string;
   method: string;
   path: string;
   status: number;
@@ -45,10 +47,17 @@ export type CmsAuditEntry = {
   errorCode?: string;
 };
 
-type CmsAuditLogger = (entry: CmsAuditEntry) => void;
+type CmsAuditLogger = (entry: CmsAuditEntry) => void | Promise<void>;
 
 const principalByContext = new WeakMap<Context, CmsPrincipal>();
+const auditResourceByContext = new WeakMap<
+  Context,
+  { resourceId: string; parentResourceId?: string }
+>();
 const RATE_WINDOW_MS = 60_000;
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
+const MAX_RATE_LIMIT_PER_MINUTE = 10_000;
+const MAX_AUTH_RATE_KEYS = 10_000;
 
 let auditLogger: CmsAuditLogger = (entry) => {
   if (process.env.NODE_ENV === "test") {
@@ -63,11 +72,6 @@ export function registerCmsSecurity(
   options: CmsSecurityOptions = readCmsSecurityOptions(),
 ): void {
   app.use("/api/v1/cms/*", cmsAuditMiddleware());
-  app.use("/api/v1/cms/*", cmsAuthenticationMiddleware(options.credentials));
-  app.use(
-    "/api/v1/cms/*",
-    cmsRateLimitMiddleware(options.rateLimitPerMinute),
-  );
   app.use(
     "/api/v1/cms/*",
     bodyLimit({
@@ -84,6 +88,23 @@ export function registerCmsSecurity(
       },
     }),
   );
+  app.use(
+    "/api/v1/cms/*",
+    cmsRateLimitMiddleware(
+      options.authenticationAttemptLimitPerMinute,
+      readAuthenticationRateKey,
+      MAX_AUTH_RATE_KEYS,
+    ),
+  );
+  app.use("/api/v1/cms/*", cmsAuthenticationMiddleware(options.credentials));
+  app.use(
+    "/api/v1/cms/*",
+    cmsRateLimitMiddleware(
+      options.rateLimitPerMinute,
+      (c) => getCmsPrincipal(c)?.actorId ?? "anonymous",
+      options.credentials.length || 1,
+    ),
+  );
 }
 
 export function readCmsSecurityOptions(
@@ -91,27 +112,36 @@ export function readCmsSecurityOptions(
 ): CmsSecurityOptions {
   return {
     credentials: parseCmsCredentials(environment.CMS_API_KEYS),
+    authenticationAttemptLimitPerMinute: readPositiveInteger(
+      environment.CMS_AUTH_ATTEMPT_LIMIT_PER_MINUTE,
+      300,
+      "CMS_AUTH_ATTEMPT_LIMIT_PER_MINUTE",
+      MAX_RATE_LIMIT_PER_MINUTE,
+    ),
     maxBodyBytes: readPositiveInteger(
       environment.CMS_MAX_BODY_BYTES,
       1024 * 1024,
       "CMS_MAX_BODY_BYTES",
+      MAX_BODY_BYTES,
     ),
     rateLimitPerMinute: readPositiveInteger(
       environment.CMS_RATE_LIMIT_PER_MINUTE,
       120,
       "CMS_RATE_LIMIT_PER_MINUTE",
+      MAX_RATE_LIMIT_PER_MINUTE,
     ),
   };
 }
 
 export function parseCmsCredentials(value: string | undefined): CmsCredential[] {
-  const rawEntries = value
-    ?.split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
-
-  if (!rawEntries?.length) {
+  if (value === undefined || value.trim() === "") {
     return [];
+  }
+
+  const rawEntries = value.split(",").map((entry) => entry.trim());
+
+  if (rawEntries.some((entry) => entry === "")) {
+    throw new Error("CMS_API_KEYS must not contain empty entries.");
   }
 
   const credentials = rawEntries.map((entry) => {
@@ -119,9 +149,9 @@ export function parseCmsCredentials(value: string | undefined): CmsCredential[] 
     const role = rawRole?.trim();
     const secret = secretParts.join(":").trim();
 
-    if (!actorId?.trim() || !isCmsRole(role) || secret.length < 16) {
+    if (!actorId?.trim() || !isCmsRole(role) || secret.length < 32) {
       throw new Error(
-        "CMS_API_KEYS entries must use actorId:reader|editor|admin:secret with a secret of at least 16 characters.",
+        "CMS_API_KEYS entries must use actorId:reader|editor|admin:secret with a secret of at least 32 characters.",
       );
     }
 
@@ -132,8 +162,16 @@ export function parseCmsCredentials(value: string | undefined): CmsCredential[] 
     };
   });
 
-  if (new Set(credentials.map(({ actorId }) => actorId)).size !== credentials.length) {
-    throw new Error("CMS_API_KEYS actor IDs must be unique.");
+  const roleByActor = new Map<string, CmsRole>();
+
+  for (const credential of credentials) {
+    const existingRole = roleByActor.get(credential.actorId);
+
+    if (existingRole && existingRole !== credential.role) {
+      throw new Error("Rotated CMS keys for one actor must use the same role.");
+    }
+
+    roleByActor.set(credential.actorId, credential.role);
   }
 
   if (new Set(credentials.map(({ secret }) => secret)).size !== credentials.length) {
@@ -145,6 +183,17 @@ export function parseCmsCredentials(value: string | undefined): CmsCredential[] 
 
 export function getCmsPrincipal(c: Context): CmsPrincipal | undefined {
   return principalByContext.get(c);
+}
+
+export function setCmsAuditResource(
+  c: Context,
+  resourceId: string,
+  parentResourceId?: string,
+): void {
+  auditResourceByContext.set(c, {
+    resourceId,
+    ...(parentResourceId ? { parentResourceId } : {}),
+  });
 }
 
 export function setCmsAuditLogger(logger: CmsAuditLogger): () => void {
@@ -160,6 +209,11 @@ function cmsAuthenticationMiddleware(
   credentials: CmsCredential[],
 ): MiddlewareHandler {
   return async (c, next) => {
+    if (c.req.method === "OPTIONS") {
+      await next();
+      return;
+    }
+
     if (credentials.length === 0) {
       throw new ApiError(
         503,
@@ -171,6 +225,7 @@ function cmsAuthenticationMiddleware(
     const token = readBearerToken(c.req.header("Authorization"));
 
     if (!token) {
+      c.header("WWW-Authenticate", 'Bearer realm="cms"');
       throw new ApiError(
         401,
         "CMS_AUTHENTICATION_REQUIRED",
@@ -183,6 +238,7 @@ function cmsAuthenticationMiddleware(
     );
 
     if (!credential) {
+      c.header("WWW-Authenticate", 'Bearer realm="cms", error="invalid_token"');
       throw new ApiError(401, "INVALID_CMS_API_KEY", "CMS bearer token is invalid.");
     }
 
@@ -208,21 +264,26 @@ function cmsAuthenticationMiddleware(
   };
 }
 
-function cmsRateLimitMiddleware(limit: number): MiddlewareHandler {
-  const usageByActor = new Map<string, { count: number; windowStartedAt: number }>();
+function cmsRateLimitMiddleware(
+  limit: number,
+  readKey: (c: Context) => string,
+  maximumKeys: number,
+): MiddlewareHandler {
+  const usageByKey = new Map<string, { count: number; windowStartedAt: number }>();
 
   return async (c, next) => {
-    const principal = getCmsPrincipal(c);
-
-    if (!principal) {
-      throw new ApiError(401, "CMS_AUTHENTICATION_REQUIRED", "CMS authentication is required.");
-    }
-
     const now = Date.now();
-    const usage = usageByActor.get(principal.actorId);
+    const requestedKey = readKey(c);
+    const key = ensureRateLimitKeyCapacity(
+      usageByKey,
+      requestedKey,
+      now,
+      maximumKeys,
+    );
+    const usage = usageByKey.get(key);
 
     if (!usage || now - usage.windowStartedAt >= RATE_WINDOW_MS) {
-      usageByActor.set(principal.actorId, { count: 1, windowStartedAt: now });
+      usageByKey.set(key, { count: 1, windowStartedAt: now });
     } else {
       usage.count += 1;
 
@@ -258,8 +319,9 @@ function cmsAuditMiddleware(): MiddlewareHandler {
       const errorCode = readErrorCode(thrownError) ?? getRequestErrorCode(c);
       const principal = getCmsPrincipal(c);
       const resource = describeCmsResource(c.req.path);
+      const auditedResource = auditResourceByContext.get(c);
 
-      auditLogger({
+      await emitAuditEntry({
         event: "cms_audit",
         timestamp: new Date().toISOString(),
         requestId: getRequestId(c),
@@ -267,7 +329,12 @@ function cmsAuditMiddleware(): MiddlewareHandler {
         ...(principal ? { role: principal.role } : {}),
         action: actionForMethod(c.req.method),
         resourceType: resource.resourceType,
-        ...(resource.resourceId ? { resourceId: resource.resourceId } : {}),
+        ...(auditedResource?.resourceId || resource.resourceId
+          ? { resourceId: auditedResource?.resourceId ?? resource.resourceId }
+          : {}),
+        ...(auditedResource?.parentResourceId
+          ? { parentResourceId: auditedResource.parentResourceId }
+          : {}),
         method: c.req.method,
         path: c.req.path,
         status,
@@ -282,15 +349,22 @@ function readPositiveInteger(
   value: string | undefined,
   fallback: number,
   name: string,
+  maximum: number,
 ): number {
   if (value === undefined || value.trim() === "") {
     return fallback;
   }
 
-  const parsed = Number(value);
+  const normalized = value.trim();
 
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer.`);
+  if (!/^[1-9]\d*$/.test(normalized)) {
+    throw new Error(`${name} must be a positive decimal integer.`);
+  }
+
+  const parsed = Number(normalized);
+
+  if (!Number.isSafeInteger(parsed) || parsed > maximum) {
+    throw new Error(`${name} must be at most ${maximum}.`);
   }
 
   return parsed;
@@ -364,13 +438,11 @@ function describeCmsResource(path: string): {
   }
 
   if (resourceName === "channels") {
-    const epgIndex = segments.indexOf("epg");
-
-    if (epgIndex >= 0) {
+    if (segments[5] === "epg") {
       return {
         resourceType: "epg_program",
-        ...(segments[epgIndex + 1]
-          ? { resourceId: segments[epgIndex + 1] }
+        ...(segments[6]
+          ? { resourceId: segments[6] }
           : {}),
       };
     }
@@ -410,4 +482,57 @@ function readErrorCode(error: unknown): string | undefined {
   }
 
   return undefined;
+}
+
+function readAuthenticationRateKey(c: Context): string {
+  const forwardedFor = c.req.header("X-Forwarded-For")
+    ?.split(",")[0]
+    ?.trim();
+  const clientAddress =
+    c.req.header("CF-Connecting-IP")?.trim() ||
+    c.req.header("X-Real-IP")?.trim() ||
+    forwardedFor ||
+    "unknown-client";
+
+  return createHash("sha256").update(clientAddress).digest("hex");
+}
+
+function ensureRateLimitKeyCapacity(
+  usageByKey: Map<string, { count: number; windowStartedAt: number }>,
+  requestedKey: string,
+  now: number,
+  maximumKeys: number,
+): string {
+  if (usageByKey.has(requestedKey) || usageByKey.size < maximumKeys) {
+    return requestedKey;
+  }
+
+  for (const [key, usage] of usageByKey) {
+    if (now - usage.windowStartedAt >= RATE_WINDOW_MS) {
+      usageByKey.delete(key);
+    }
+  }
+
+  return usageByKey.size < maximumKeys ? requestedKey : "overflow";
+}
+
+async function emitAuditEntry(entry: CmsAuditEntry): Promise<void> {
+  try {
+    await auditLogger(entry);
+  } catch {
+    // Audit emission is best-effort at this layer. A production deployment can
+    // replace the sink with a durable collector; a sink outage must never make
+    // a committed mutation look failed to the caller.
+    try {
+      console.error(
+        JSON.stringify({
+          event: "cms_audit_sink_error",
+          requestId: entry.requestId,
+          timestamp: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // Logging infrastructure must not affect the HTTP result.
+    }
+  }
 }

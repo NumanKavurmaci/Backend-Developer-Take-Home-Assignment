@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { ApiError } from "../../shared/http/api-error.js";
+import { setCmsAuditResource } from "../../shared/http/cms-security.js";
 import {
   CmsContentService,
   createContentEtag,
@@ -13,6 +14,7 @@ export class CmsContentController {
       await readJsonBody(c),
     );
 
+    setCmsAuditResource(c, content.id);
     c.header("ETag", createContentEtag(content.updatedAt));
     return c.json(content, 201);
   }
