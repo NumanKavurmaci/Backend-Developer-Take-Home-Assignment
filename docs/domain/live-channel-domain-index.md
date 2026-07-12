@@ -190,7 +190,7 @@ transaction
 The application uses a transaction and one lock row per channel. PostgreSQL
 also enforces valid time ranges and non-overlapping schedules. The complete
 human-readable explanation lives in
-[Database Structure](../database-structure.md#epg-integrity-and-concurrency).
+[Database Structure](../database/database-structure.md#epg-integrity-and-concurrency).
 
 ### `getLiveChannelById(prisma, channelId)`
 

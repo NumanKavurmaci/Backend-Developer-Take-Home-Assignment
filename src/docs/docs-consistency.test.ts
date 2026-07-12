@@ -19,6 +19,22 @@ const requiredProjectFiles = [
 ];
 
 describe("documentation consistency", () => {
+  it("keeps every documentation artifact in a category folder", async () => {
+    const docsEntries = await readdir(path.join(rootDir, "docs"), {
+      withFileTypes: true,
+    });
+
+    expect(
+      docsEntries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+    ).toEqual([]);
+    expect(
+      docsEntries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(["api", "ci-cd", "database", "domain", "project"]);
+  });
+
   it("keeps project documentation under docs/project only", async () => {
     expect(existsSync(path.join(rootDir, "project"))).toBe(false);
 
@@ -77,10 +93,13 @@ describe("documentation consistency", () => {
       readFile(path.join(rootDir, "render.yaml"), "utf8"),
       readFile(path.join(rootDir, "README.md"), "utf8"),
       readFile(
-        path.join(rootDir, "docs", "deployment-runbook.md"),
+        path.join(rootDir, "docs", "ci-cd", "deployment-runbook.md"),
         "utf8",
       ),
-      readFile(path.join(rootDir, "docs", "database-structure.md"), "utf8"),
+      readFile(
+        path.join(rootDir, "docs", "database", "database-structure.md"),
+        "utf8",
+      ),
     ]);
 
     expect(blueprint).toContain('postgresMajorVersion: "18"');

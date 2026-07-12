@@ -337,7 +337,7 @@ npm run db:studio
   command. Production seeding is refused.
 
 Operational cutover, backup/restore, and rollback steps are documented in the
-[deployment runbook](deployment-runbook.md).
+[deployment runbook](../ci-cd/deployment-runbook.md).
 
 ## Seed Data
 

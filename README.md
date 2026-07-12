@@ -165,7 +165,7 @@ This command seeds data and is therefore not a production deployment command.
 Use `npm run db:migrate:deploy` followed by read-only checks for production.
 
 Provisioning, rehearsal, backup/restore, cutover, and rollback instructions are
-in the [deployment runbook](docs/deployment-runbook.md).
+in the [deployment runbook](docs/ci-cd/deployment-runbook.md).
 
 ## API Surface
 
@@ -222,8 +222,8 @@ Every response includes `X-Request-Id`. If the caller sends `X-Request-Id`, the 
 | Content metadata API | [docs/api/content-metadata-api.md](docs/api/content-metadata-api.md) |
 | CMS EPG program API | [docs/api/cms-epg-program-api.md](docs/api/cms-epg-program-api.md) |
 | Middleware playback API | [docs/api/mw-playback-api.md](docs/api/mw-playback-api.md) |
-| Database structure | [docs/database-structure.md](docs/database-structure.md) |
-| Deployment and rollback runbook | [docs/deployment-runbook.md](docs/deployment-runbook.md) |
+| Database structure | [docs/database/database-structure.md](docs/database/database-structure.md) |
+| Deployment and rollback runbook | [docs/ci-cd/deployment-runbook.md](docs/ci-cd/deployment-runbook.md) |
 | Content domain | [docs/domain/content-domain-index.md](docs/domain/content-domain-index.md) |
 | Live channel domain | [docs/domain/live-channel-domain-index.md](docs/domain/live-channel-domain-index.md) |
 | Assignment notes | [docs/project/assignment.md](docs/project/assignment.md) |

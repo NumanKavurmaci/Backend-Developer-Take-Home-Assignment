@@ -1,7 +1,7 @@
 # Managed PostgreSQL Deployment Runbook
 
 This runbook covers the shared demo deployment declared in
-[`render.yaml`](../render.yaml). It is also the checklist for a staging
+[`render.yaml`](../../render.yaml). It is also the checklist for a staging
 rehearsal and production-style cutover. Record the operator, timestamps,
 deployment URL, database identifier, backup identifier, and application commit
 in the deployment ticket.

@@ -374,7 +374,7 @@ The README currently describes SQLite commands and a disposable SQLite test data
 - EPG overlap and concurrency behavior work in the deployed environment.
 - No production configuration references SQLite.
 - README setup commands are updated.
-- `docs/database-structure.md` describes PostgreSQL types and constraints.
+- `docs/database/database-structure.md` describes PostgreSQL types and constraints.
 - EPG concurrency documentation describes both the lock row and exclusion constraint.
 - CI and deployment migration responsibilities are documented.
 - A rollback runbook is included.
