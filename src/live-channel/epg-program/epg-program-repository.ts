@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { prepareEpgProgramCreateInput } from "./epg-program.js";
+import { toEpgProgramDomainError } from "./epg-program-error-mapper.js";
 import type {
   CreateEpgProgramInput,
   EpgProgramRecord,
@@ -15,15 +16,19 @@ export async function createEpgProgram(
   const data = prepareEpgProgramCreateInput(input);
   await assertNoOverlappingEpgProgram(prisma, data);
 
-  return prisma.epgProgram.create({
-    data: {
-      id: data.id,
-      channelId: data.channelId,
-      programName: data.programName,
-      startTime: data.startTime,
-      endTime: data.endTime,
-    },
-  });
+  try {
+    return await prisma.epgProgram.create({
+      data: {
+        id: data.id,
+        channelId: data.channelId,
+        programName: data.programName,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      },
+    });
+  } catch (error) {
+    throw toEpgProgramDomainError(error) ?? error;
+  }
 }
 
 /**
@@ -37,23 +42,27 @@ export async function createEpgProgramWithConcurrencyLock(
 ): Promise<EpgProgramRecord> {
   const data = prepareEpgProgramCreateInput(input);
 
-  return prisma.$transaction(async (transaction) => {
-    await transaction.epgScheduleLock.upsert({
-      where: {
-        channelId: data.channelId,
-      },
-      update: {
-        version: {
-          increment: 1,
+  try {
+    return await prisma.$transaction(async (transaction) => {
+      await transaction.epgScheduleLock.upsert({
+        where: {
+          channelId: data.channelId,
         },
-      },
-      create: {
-        channelId: data.channelId,
-      },
-    });
+        update: {
+          version: {
+            increment: 1,
+          },
+        },
+        create: {
+          channelId: data.channelId,
+        },
+      });
 
-    return createEpgProgram(transaction, data);
-  });
+      return createEpgProgram(transaction, data);
+    });
+  } catch (error) {
+    throw toEpgProgramDomainError(error) ?? error;
+  }
 }
 
 export async function assertNoOverlappingEpgProgram(

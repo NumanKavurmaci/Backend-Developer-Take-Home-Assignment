@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -29,8 +29,8 @@ model Content {
   geoBlockCountriesOverride Boolean                  @default(false)
   geoBlockCountries         ContentGeoBlockCountry[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@index([type])
   @@index([parentId])
@@ -55,21 +55,21 @@ model LiveChannel {
   epgPrograms  EpgProgram[]
   scheduleLock EpgScheduleLock?
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model EpgProgram {
   id          String   @id @default(cuid())
   channelId   String
   programName String
-  startTime   DateTime
-  endTime     DateTime
+  startTime   DateTime @db.Timestamptz(3)
+  endTime     DateTime @db.Timestamptz(3)
 
   channel LiveChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([channelId, startTime, endTime])
   @@index([channelId, startTime, endTime])
@@ -82,5 +82,5 @@ model EpgScheduleLock {
 
   channel LiveChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
 
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }

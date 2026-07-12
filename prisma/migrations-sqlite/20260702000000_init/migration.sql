@@ -1,3 +1,5 @@
+-- Archived SQLite migration. Do not apply to PostgreSQL.
+
 -- CreateTable
 CREATE TABLE "Content" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -79,3 +81,4 @@ CREATE INDEX "EpgProgram_channelId_endTime_idx" ON "EpgProgram"("channelId", "en
 
 -- CreateIndex
 CREATE UNIQUE INDEX "EpgProgram_channelId_startTime_endTime_key" ON "EpgProgram"("channelId", "startTime", "endTime");
+

@@ -3,6 +3,9 @@ import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearLiveChannelTables } from "../../test/test-database.js";
 import { createLiveChannel } from "../../live-channel/live-channel-repository.js";
+import {
+  toEpgProgramDomainError,
+} from "../../live-channel/epg-program/epg-program-error-mapper.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
 import { CmsEpgProgramController } from "./cms-epg-program.controller.js";
@@ -216,6 +219,56 @@ describe("CMS EPG program API routes", () => {
       message: "EPG program overlaps with an existing schedule on this channel.",
     });
     expect(response.status).toBe(400);
+  });
+
+  it("maps a real database exclusion violation to 400 EPG_OVERLAP", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-database-overlap",
+      name: "Database Overlap",
+      slug: "database-overlap",
+    });
+    await prisma.epgProgram.create({
+      data: {
+        id: "epg-database-existing",
+        channelId: "channel-database-overlap",
+        programName: "Existing Program",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T20:00:00.000Z"),
+      },
+    });
+
+    const response = await createTestApp({
+      async createProgram() {
+        try {
+          return await prisma.epgProgram.create({
+            data: {
+              id: "epg-database-overlap",
+              channelId: "channel-database-overlap",
+              programName: "Overlapping Program",
+              startTime: new Date("2026-07-02T19:00:00.000Z"),
+              endTime: new Date("2026-07-02T21:00:00.000Z"),
+            },
+          });
+        } catch (error) {
+          throw toEpgProgramDomainError(error) ?? error;
+        }
+      },
+    }).request("/api/v1/cms/channels/channel-database-overlap/epg", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        programName: "Overlapping Program",
+        startTime: "2026-07-02T19:00:00Z",
+        endTime: "2026-07-02T21:00:00Z",
+      }),
+    });
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "EPG_OVERLAP",
+      message: "EPG program overlaps with an existing schedule on this channel.",
+    });
+    expect(response.status).toBe(400);
+    await expect(prisma.epgProgram.count()).resolves.toBe(1);
   });
 
   it("returns a consistent 404 response when the channel is missing", async () => {

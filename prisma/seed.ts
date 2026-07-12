@@ -1,4 +1,20 @@
-import { prisma } from "../src/db/client.js";
+import { pathToFileURL } from "node:url";
+import { loadEnvFile } from "node:process";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  assertConnectedToDestructiveTarget,
+  validateDestructiveDatabaseTarget,
+} from "../src/db/destructive-operation-guard.js";
+
+function assertDemoSeedWasExplicitlyRequested(): void {
+  const explicitlyRequested = process.argv.includes("--demo");
+
+  if (!explicitlyRequested) {
+    throw new Error(
+      "Demo seed refused. The destructive seed must be explicitly requested with --demo.",
+    );
+  }
+}
 
 const contentIds = {
   series: "series-galactic-odyssey",
@@ -21,8 +37,7 @@ const epgScheduleTimes = {
   marketWatchEnd: "2026-07-02T10:00:00.000Z",
 } as const;
 
-const UTC_TIMESTAMP_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 function readSeedUtcDate(value: string): Date {
   if (!UTC_TIMESTAMP_PATTERN.test(value)) {
@@ -38,18 +53,17 @@ function readSeedUtcDate(value: string): Date {
   return date;
 }
 
-async function clearExistingData() {
-  await prisma.$transaction([
-    prisma.epgProgram.deleteMany(),
-    prisma.epgScheduleLock.deleteMany(),
-    prisma.liveChannel.deleteMany(),
-    prisma.contentGeoBlockCountry.deleteMany(),
-    prisma.content.deleteMany(),
-  ]);
+async function clearExistingData(transaction: Prisma.TransactionClient) {
+  await transaction.epgProgram.deleteMany();
+  await transaction.epgScheduleLock.deleteMany();
+  await transaction.liveChannel.deleteMany();
+  await transaction.contentGeoBlockCountry.deleteMany();
+  await transaction.content.updateMany({ data: { parentId: null } });
+  await transaction.content.deleteMany();
 }
 
-async function seedContent() {
-  await prisma.content.create({
+async function seedContent(transaction: Prisma.TransactionClient) {
+  await transaction.content.create({
     data: {
       id: contentIds.series,
       type: "SERIES",
@@ -66,7 +80,7 @@ async function seedContent() {
     },
   });
 
-  await prisma.content.create({
+  await transaction.content.create({
     data: {
       id: contentIds.season,
       type: "SEASON",
@@ -77,7 +91,7 @@ async function seedContent() {
     },
   });
 
-  await prisma.content.createMany({
+  await transaction.content.createMany({
     data: [
       {
         id: contentIds.episodeInherited,
@@ -119,7 +133,7 @@ async function seedContent() {
     ],
   });
 
-  await prisma.contentGeoBlockCountry.createMany({
+  await transaction.contentGeoBlockCountry.createMany({
     data: [
       {
         contentId: contentIds.moviePremium4k,
@@ -133,8 +147,8 @@ async function seedContent() {
   });
 }
 
-async function seedLiveChannels() {
-  await prisma.liveChannel.create({
+async function seedLiveChannels(transaction: Prisma.TransactionClient) {
+  await transaction.liveChannel.create({
     data: {
       id: channelIds.news,
       name: "Saat News",
@@ -163,7 +177,7 @@ async function seedLiveChannels() {
     },
   });
 
-  await prisma.liveChannel.create({
+  await transaction.liveChannel.create({
     data: {
       id: channelIds.sports,
       name: "Saat Sports",
@@ -187,44 +201,89 @@ async function seedLiveChannels() {
   });
 }
 
-async function main() {
-  await clearExistingData();
-  await seedContent();
-  await seedLiveChannels();
+export async function seedDemoData(
+  prisma: PrismaClient,
+  afterClear?: () => void | Promise<void>,
+) {
+  const target = validateDestructiveDatabaseTarget();
+  await assertConnectedToDestructiveTarget(prisma, target);
 
-  const [contentCount, channelCount, epgProgramCount] = await Promise.all([
-    prisma.content.count(),
-    prisma.liveChannel.count(),
-    prisma.epgProgram.count(),
-  ]);
+  return prisma.$transaction(
+    async (transaction) => {
+      await clearExistingData(transaction);
+      await afterClear?.();
+      await seedContent(transaction);
+      await seedLiveChannels(transaction);
 
-  console.log(
-    JSON.stringify(
-      {
-        seeded: true,
-        contentCount,
-        channelCount,
-        epgProgramCount,
-        usefulIds: {
-          inheritedEpisode: contentIds.episodeInherited,
-          seasonOverrideEpisode: contentIds.episodeSeasonOverride,
-          premium4kEpisode: contentIds.episodePremium4k,
-          geoBlockedPremiumMovie: contentIds.moviePremium4k,
-          newsChannel: channelIds.news,
-          sportsChannel: channelIds.sports,
-        },
-      },
-      null,
-      2,
-    ),
+      const [contentCount, channelCount, epgProgramCount] = await Promise.all([
+        transaction.content.count(),
+        transaction.liveChannel.count(),
+        transaction.epgProgram.count(),
+      ]);
+
+      if (contentCount !== 6 || channelCount !== 2 || epgProgramCount !== 3) {
+        throw new Error(
+          `Demo seed verification failed inside transaction: content=${contentCount}, channels=${channelCount}, epgPrograms=${epgProgramCount}.`,
+        );
+      }
+
+      return { contentCount, channelCount, epgProgramCount };
+    },
+    { maxWait: 5_000, timeout: 30_000 },
   );
 }
 
-main()
-  .catch((error) => {
+async function main() {
+  loadEnvironmentFileIfPresent();
+  assertDemoSeedWasExplicitlyRequested();
+  validateDestructiveDatabaseTarget();
+  const { prisma } = await import("../src/db/client.js");
+  try {
+    const { contentCount, channelCount, epgProgramCount } =
+      await seedDemoData(prisma);
+
+    console.log(
+      JSON.stringify(
+        {
+          seeded: true,
+          contentCount,
+          channelCount,
+          epgProgramCount,
+          usefulIds: {
+            inheritedEpisode: contentIds.episodeInherited,
+            seasonOverrideEpisode: contentIds.episodeSeasonOverride,
+            premium4kEpisode: contentIds.episodePremium4k,
+            geoBlockedPremiumMovie: contentIds.moviePremium4k,
+            newsChannel: channelIds.news,
+            sportsChannel: channelIds.sports,
+          },
+        },
+        null,
+        2,
+      ),
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+function loadEnvironmentFileIfPresent(): void {
+  try {
+    loadEnvFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMain) {
+  main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });
+}

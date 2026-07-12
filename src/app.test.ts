@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 import { createApp } from "./app.js";
 import { HealthController } from "./modules/health/health.controller.js";
+import { ApiError } from "./shared/http/api-error.js";
 import {
   requestObservabilityMiddleware,
   setRequestLogger,
@@ -15,7 +16,8 @@ describe("Hono app scaffold", () => {
 
     await expect(response.json()).resolves.toEqual({
       project: "SaatCMS Middleware Core",
-      message: "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
+      message:
+        "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
       author: "Numan Kavurmacı",
       location: "Samsun, Türkiye",
       signedDate: "2026-07-03",
@@ -43,7 +45,7 @@ describe("Hono app scaffold", () => {
     expect(response.status).toBe(200);
   });
 
-  it("returns readiness failure when the database check fails", async () => {
+  it("returns readiness failure when PostgreSQL is unreachable", async () => {
     const app = new Hono();
     const controller = new HealthController(async () => {
       throw new Error("database connection refused");
@@ -66,7 +68,7 @@ describe("Hono app scaffold", () => {
       status: "not_ready",
       service: "saatcms-middleware-core",
       errorCode: "DATABASE_NOT_READY",
-      message: "Database is not reachable.",
+      message: "Database is unreachable or its schema is not ready.",
     });
     expect(response.status).toBe(503);
     expect(logs).toHaveLength(1);
@@ -179,6 +181,39 @@ describe("Hono app scaffold", () => {
     });
     expect(JSON.stringify(body)).not.toContain("playbackUrl");
     expect(JSON.stringify(body)).not.toContain("secret.m3u8");
+    expect(response.status).toBe(500);
+  });
+
+  it("preserves explicitly recognized API errors", async () => {
+    const app = createApp();
+    app.get("/api-error", () => {
+      throw new ApiError(429, "RATE_LIMITED", "Try again later.");
+    });
+
+    const response = await app.request("/api-error");
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "RATE_LIMITED",
+      message: "Try again later.",
+    });
+    expect(response.status).toBe(429);
+  });
+
+  it("does not expose Prisma infrastructure error codes", async () => {
+    const app = createApp();
+    app.get("/database-error", () => {
+      throw Object.assign(new Error("Database connection failed"), {
+        errorCode: "P1001",
+        code: "P2024",
+      });
+    });
+
+    const response = await app.request("/database-error");
+
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "INTERNAL_SERVER_ERROR",
+      message: "Unexpected server error.",
+    });
     expect(response.status).toBe(500);
   });
 

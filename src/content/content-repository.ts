@@ -150,7 +150,7 @@ export async function getContentAncestorPath(
   return rows.map(toContent);
 }
 
-// Recursive SQLite CTE walks upward from the requested content to its root parent.
+// Recursive PostgreSQL CTE walks upward from the requested content to its root parent.
 async function fetchContentAncestorRows(
   prisma: PrismaClient,
   contentId: string,
@@ -160,80 +160,80 @@ async function fetchContentAncestorRows(
       id,
       type,
       title,
-      parentId,
-      parentalRating,
+      "parentId",
+      "parentalRating",
       genre,
       quality,
-      isPremium,
-      playbackUrl,
-      geoBlockCountriesOverride,
-      createdAt,
-      updatedAt,
+      "isPremium",
+      "playbackUrl",
+      "geoBlockCountriesOverride",
+      "createdAt",
+      "updatedAt",
       depth,
       path,
-      hasCycle
+      "hasCycle"
     ) AS (
       SELECT
-        id,
-        type,
-        title,
-        parentId,
-        parentalRating,
-        genre,
-        quality,
-        isPremium,
-        playbackUrl,
-        geoBlockCountriesOverride,
-        createdAt,
-        updatedAt,
+        "id",
+        "type",
+        "title",
+        "parentId",
+        "parentalRating",
+        "genre",
+        "quality",
+        "isPremium",
+        "playbackUrl",
+        "geoBlockCountriesOverride",
+        "createdAt",
+        "updatedAt",
         0 AS depth,
-        ',' || id || ',' AS path,
-        0 AS hasCycle
+        ',' || "id" || ',' AS path,
+        false AS "hasCycle"
       FROM "Content"
-      WHERE id = ${contentId}
+      WHERE "id" = ${contentId}
 
       UNION ALL
 
       SELECT
-        parent.id,
-        parent.type,
-        parent.title,
-        parent.parentId,
-        parent.parentalRating,
-        parent.genre,
-        parent.quality,
-        parent.isPremium,
-        parent.playbackUrl,
-        parent.geoBlockCountriesOverride,
-        parent.createdAt,
-        parent.updatedAt,
+        parent."id",
+        parent."type",
+        parent."title",
+        parent."parentId",
+        parent."parentalRating",
+        parent."genre",
+        parent."quality",
+        parent."isPremium",
+        parent."playbackUrl",
+        parent."geoBlockCountriesOverride",
+        parent."createdAt",
+        parent."updatedAt",
         ancestors.depth + 1 AS depth,
-        ancestors.path || parent.id || ',' AS path,
+        ancestors.path || parent."id" || ',' AS path,
         CASE
-          WHEN instr(ancestors.path, ',' || parent.id || ',') > 0 THEN 1
-          ELSE 0
-        END AS hasCycle
+          WHEN POSITION(',' || parent."id" || ',' IN ancestors.path) > 0 THEN true
+          ELSE false
+        END AS "hasCycle"
       FROM "Content" parent
-      JOIN ancestors ON parent.id = ancestors.parentId
-      WHERE ancestors.parentId IS NOT NULL
+      JOIN ancestors ON parent."id" = ancestors."parentId"
+      WHERE ancestors."parentId" IS NOT NULL
         AND ancestors.depth < ${MAX_CONTENT_HIERARCHY_DEPTH - 1}
-        AND ancestors.hasCycle = 0
+        AND NOT ancestors."hasCycle"
     )
     SELECT
       id,
       type,
       title,
-      parentId,
-      parentalRating,
+      "parentId",
+      "parentalRating",
       genre,
       quality,
-      isPremium,
-      playbackUrl,
-      geoBlockCountriesOverride,
-      createdAt,
-      updatedAt,
+      "isPremium",
+      "playbackUrl",
+      "geoBlockCountriesOverride",
+      "createdAt",
+      "updatedAt",
       depth,
-      hasCycle
+      "hasCycle"
     FROM ancestors
     ORDER BY depth DESC;
   `;

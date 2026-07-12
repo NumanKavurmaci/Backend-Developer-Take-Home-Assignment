@@ -1,24 +1,12 @@
 # Database Structure
 
-The project uses SQLite with Prisma.
-
-The local database file is created here:
-
-```text
-data/dev.db
-```
-
-The database URL is defined in `.env`:
-
-```env
-DATABASE_URL="file:../data/dev.db"
-```
-
-Prisma resolves this path from the `prisma/` folder.
+The project uses PostgreSQL through Prisma. The local Docker Compose setup
+provides the development database `saatcms` and the disposable test database
+`saatcms_test`.
 
 ## What The Database Needs To Support
 
-The assignment has three main data problems:
+The assignment has four main data problems:
 
 - Content can be nested as `Series -> Season -> Episode`.
 - Some metadata can be inherited from a parent item.
@@ -45,6 +33,19 @@ The database has two main areas:
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
 | Content metadata | `Content`, `ContentGeoBlockCountry`            | Stores the content tree and inherited playback metadata.                       |
 | Live scheduling  | `LiveChannel`, `EpgProgram`, `EpgScheduleLock` | Stores channels, schedules, and the per-channel lock used for safe EPG writes. |
+
+## PostgreSQL Column Types
+
+| Prisma field                                     | PostgreSQL representation | Why                                                |
+| ------------------------------------------------ | ------------------------- | -------------------------------------------------- |
+| IDs, names, slugs, and URLs                      | `TEXT`                    | Variable-length identifiers and text values        |
+| `isPremium`, `geoBlockCountriesOverride`         | `BOOLEAN`                 | Native true/false values                           |
+| `version`                                        | `INTEGER`                 | Lock-row update counter                            |
+| `createdAt`, `updatedAt`, `startTime`, `endTime` | `TIMESTAMPTZ(3)`          | Millisecond timestamps stored as absolute instants |
+
+Primary keys, composite keys, indexes, foreign keys, and checks are created by
+the committed Prisma SQL migrations. Parent content uses `ON DELETE RESTRICT`;
+geo-block rows, EPG programs, and schedule-lock rows use `ON DELETE CASCADE`.
 
 ## Relationships
 
@@ -108,7 +109,7 @@ Hierarchy validation lives in the content domain layer:
 
 Invalid combinations are rejected before writing to the database. For example, an `EPISODE` cannot be created directly under a `SERIES`.
 
-Ancestor path queries are loaded with one recursive SQLite query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
+Ancestor path queries are loaded with one recursive PostgreSQL query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
 
 ### Inherited Metadata
 
@@ -139,7 +140,7 @@ Allowed `quality` values:
 - `HD`
 - `UHD_4K`
 
-SQLite stores `type` and `quality` as strings. The application code validates the allowed values before saving data, and the database also has `CHECK` constraints so unsupported values are rejected if another script bypasses the domain layer.
+PostgreSQL stores `type` and `quality` as strings. The application code validates the allowed values before saving data, and the database also has `CHECK` constraints so unsupported values are rejected if another script bypasses the domain layer.
 
 The assignment calls this field `premium`; the code stores it as `isPremium` so the boolean meaning is clear.
 
@@ -166,10 +167,10 @@ This rule is applied independently to each field. For example, an Episode can us
 
 Geo-block countries use the same closest-owner idea, but through the explicit `geoBlockCountriesOverride` flag:
 
-| Flag    | Meaning                                                              |
-| ------- | -------------------------------------------------------------------- |
-| `false` | keep looking at the parent                                           |
-| `true`  | use this content item's country rows, even when the list is empty    |
+| Flag    | Meaning                                                           |
+| ------- | ----------------------------------------------------------------- |
+| `false` | keep looking at the parent                                        |
+| `true`  | use this content item's country rows, even when the list is empty |
 
 The inheritance service validates the loaded hierarchy before resolving metadata. Corrupted data, such as an Episode directly under a Series, is rejected instead of producing a misleading result.
 
@@ -223,9 +224,11 @@ Important fields:
 
 EPG validation is always scoped to one channel.
 
-### `EpgProgram`
+### EPG integrity and concurrency
 
-Stores scheduled programs for a live channel.
+`EpgProgram` stores scheduled programs for a live channel. `EpgScheduleLock`
+stores one lock row for each channel. Together, application logic and
+PostgreSQL protect the schedule.
 
 Important fields:
 
@@ -238,44 +241,45 @@ Important fields:
 
 Seeded EPG schedules use explicit ISO UTC strings ending in `Z`. The seed script validates this convention before converting values to `Date` objects, so sample data cannot accidentally depend on the server's local timezone.
 
-Invalid ranges must be rejected:
+Two simple rules define a valid schedule:
 
-```text
-startTime >= endTime
-```
+- A program must start before it ends.
+- Programs on the same channel must not overlap.
 
-The application validates this before persistence, and the database also enforces `startTime < endTime` with a `CHECK` constraint.
+Back-to-back programs such as `10:00–11:00` and `11:00–12:00` are valid. The
+same time range is also valid on different channels.
 
-Overlap is checked with this rule:
+The first concurrency layer is the application transaction. When the API
+creates a program, it uses this sequence:
 
-```text
-newStart < existingEnd AND newEnd > existingStart
-```
+1. Update the target channel's lock row.
+2. Check for an overlapping program on that channel.
+3. Insert the program.
+4. Commit.
 
-This means back-to-back programs are allowed:
+Requests for the same channel update the same lock row and therefore run one
+after another. Requests for different channels use different lock rows.
 
-```text
-10:00-11:00
-11:00-12:00
-```
+The second concurrency layer is PostgreSQL itself. It is the final safety net
+if application validation is bypassed or independent application instances
+race:
+
+| Constraint                    | Protection                                           | API result               |
+| ----------------------------- | ---------------------------------------------------- | ------------------------ |
+| `EpgProgram_time_range_check` | Rejects `startTime >= endTime`.                      | `400 INVALID_TIME_RANGE` |
+| `EpgProgram_no_overlap_excl`  | Rejects overlapping time ranges on the same channel. | `400 EPG_OVERLAP`        |
+
+The overlap constraint treats the end time as outside the program's range,
+which is why a program may begin exactly when the previous one ends. The
+`btree_gist` PostgreSQL extension allows the constraint to consider both the
+channel ID and time range.
+
+The lock row gives friendly, channel-scoped serialization during normal API
+writes. The exclusion constraint independently guarantees that overlapping
+rows cannot commit, including writes from another process or direct SQL. Both
+layers are required.
 
 Indexes on `channelId`, `startTime`, and `endTime` make the overlap check fast for one channel.
-
-### `EpgScheduleLock`
-
-Stores one lock row per live channel.
-
-This table is used when creating EPG programs safely under concurrent requests.
-
-The write flow:
-
-1. Start a transaction.
-2. Update the channel's lock row.
-3. Check for overlapping programs.
-4. Insert the new program if no overlap exists.
-5. Commit the transaction.
-
-This makes overlapping requests for the same channel wait on the same lock row before they can write schedule data.
 
 ## Local Commands
 
@@ -285,10 +289,11 @@ Install dependencies:
 npm install
 ```
 
-Create the local database:
+Start PostgreSQL and apply migrations:
 
 ```bash
-npm run db:setup
+npm run db:start
+npm run db:migrate
 ```
 
 Load sample data:
@@ -303,17 +308,36 @@ Check the database connection:
 npm run db:check
 ```
 
-Reset the database:
+Fully reset the local PostgreSQL databases and reapply migrations:
 
 ```bash
-npm run db:reset
+npm run db:destroy
+npm run db:start
+npm run db:migrate
 ```
+
+This deletes local development and test data.
 
 Open Prisma Studio:
 
 ```bash
 npm run db:studio
 ```
+
+## Migration Ownership
+
+- Developers use `prisma migrate dev` only to create migrations locally.
+- CI applies every committed migration to a fresh PostgreSQL database with
+  `prisma migrate deploy` before running tests.
+- The deployment platform runs `prisma migrate deploy` as a pre-deploy step.
+  A migration failure blocks the new release.
+- The server process only starts the application. It never migrates, resets,
+  seeds, or relies on a database file.
+- Demo seed data is loaded only by the separate guarded `npm run db:seed`
+  command. Production seeding is refused.
+
+Operational cutover, backup/restore, and rollback steps are documented in the
+[deployment runbook](deployment-runbook.md).
 
 ## Seed Data
 

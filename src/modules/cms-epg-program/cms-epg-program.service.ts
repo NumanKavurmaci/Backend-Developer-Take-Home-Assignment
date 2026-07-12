@@ -1,5 +1,4 @@
 import { prisma } from "../../db/client.js";
-import { getLiveChannelById } from "../../live-channel/live-channel-repository.js";
 import { prepareEpgProgramCreateInput } from "../../live-channel/epg-program/epg-program.js";
 import { createEpgProgramWithConcurrencyLock } from "../../live-channel/epg-program/epg-program-repository.js";
 import { ApiError } from "../../shared/http/api-error.js";
@@ -25,8 +24,6 @@ export class CmsEpgProgramService {
   ): Promise<EpgProgramRecord> {
     const createInput = await buildCreateInput(channelId, body);
 
-    await assertChannelExists(createInput.channelId);
-
     return createEpgProgramWithConcurrencyLock(prisma, createInput);
   }
 }
@@ -49,14 +46,6 @@ async function buildCreateInput(
   });
 }
 
-async function assertChannelExists(channelId: string): Promise<void> {
-  const channel = await getLiveChannelById(prisma, channelId);
-
-  if (!channel) {
-    throw new ApiError(404, "CHANNEL_NOT_FOUND", "Channel not found");
-  }
-}
-
 function readRequestBodyObject(body: unknown): CreateEpgProgramRequestBody {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new ApiError(
@@ -71,11 +60,7 @@ function readRequestBodyObject(body: unknown): CreateEpgProgramRequestBody {
 
 function readRequiredString(value: unknown, fieldName: string): string {
   if (typeof value !== "string" || value.trim() === "") {
-    throw new ApiError(
-      400,
-      "INVALID_REQUEST_BODY",
-      `${fieldName} is required`,
-    );
+    throw new ApiError(400, "INVALID_REQUEST_BODY", `${fieldName} is required`);
   }
 
   return value;
