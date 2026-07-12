@@ -2,6 +2,7 @@ type UnknownRecord = Record<string, unknown>;
 
 export type DatabaseConstraintFailure = {
   constraintName?: string;
+  sqlState?: string;
   type?: string;
 };
 
@@ -16,6 +17,20 @@ const DATABASE_CONSTRAINT_TYPES = [
   "CheckConstraintViolation",
 ] as const;
 
+export const POSTGRESQL_INTEGRITY_SQL_STATES = [
+  "23502", // not_null_violation
+  "23503", // foreign_key_violation
+  "23505", // unique_violation
+  "23514", // check_violation
+  "23P01", // exclusion_violation
+] as const;
+
+const PRISMA_INTEGRITY_ERROR_SQL_STATES: Record<string, string> = {
+  P2002: "23505",
+  P2003: "23503",
+  P2011: "23502",
+};
+
 export function isPrismaErrorCode(error: unknown, code: string): boolean {
   return readRecord(error)?.code === code;
 }
@@ -23,20 +38,33 @@ export function isPrismaErrorCode(error: unknown, code: string): boolean {
 export function toDatabaseConstraintFailure(
   error: unknown,
 ): DatabaseConstraintFailure | undefined {
-  if (!isPrismaErrorCode(error, "P2004")) {
-    return undefined;
-  }
-
   const errorRecord = readRecord(error);
   const meta = readRecord(errorRecord?.meta);
   const details = [
+    readString(errorRecord?.name),
     readString(errorRecord?.message),
-    stringifyMetadata(meta?.database_error),
+    readString(errorRecord?.stack),
+    stringifyMetadata(meta),
   ].join(" ");
 
+  const constraintName = findConstraintName(details);
+  const sqlState =
+    findSqlState(details) ?? findPrismaIntegritySqlState(errorRecord?.code);
+  const type = findConstraintType(details);
+
+  if (
+    !isPrismaErrorCode(error, "P2004") &&
+    !constraintName &&
+    !sqlState &&
+    !type
+  ) {
+    return undefined;
+  }
+
   return {
-    constraintName: findConstraintName(details),
-    type: findConstraintType(details),
+    constraintName,
+    sqlState,
+    type,
   };
 }
 
@@ -60,6 +88,22 @@ function findConstraintType(details: string): string | undefined {
   }
 
   return undefined;
+}
+
+function findSqlState(details: string): string | undefined {
+  for (const sqlState of POSTGRESQL_INTEGRITY_SQL_STATES) {
+    if (details.includes(sqlState)) {
+      return sqlState;
+    }
+  }
+
+  return undefined;
+}
+
+function findPrismaIntegritySqlState(code: unknown): string | undefined {
+  return typeof code === "string"
+    ? PRISMA_INTEGRITY_ERROR_SQL_STATES[code]
+    : undefined;
 }
 
 function readRecord(value: unknown): UnknownRecord | undefined {

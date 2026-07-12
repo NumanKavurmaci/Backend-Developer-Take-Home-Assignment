@@ -50,7 +50,8 @@ describe("database-level constraints", () => {
     expect(failure).toBeDefined();
     expect(
       failure?.constraintName === EPG_TIME_RANGE_CONSTRAINT ||
-        failure?.type === "CheckConstraintViolation",
+        failure?.type === "CheckConstraintViolation" ||
+        failure?.sqlState === "23514",
     ).toBe(true);
 
     if (failure?.constraintName === EPG_TIME_RANGE_CONSTRAINT) {
@@ -114,6 +115,48 @@ describe("database-level constraints", () => {
       errorCode: "EPG_OVERLAP",
     });
     await expect(prisma.epgProgram.count()).resolves.toBe(1);
+  });
+
+  it("maps an EPG foreign-key violation to channel not found", async () => {
+    const error = await captureError(
+      prisma.epgProgram.create({
+        data: {
+          id: "epg-missing-channel",
+          channelId: "missing-channel",
+          programName: "Missing Channel",
+          startTime: new Date("2026-07-02T18:00:00.000Z"),
+          endTime: new Date("2026-07-02T19:00:00.000Z"),
+        },
+      }),
+    );
+
+    expect(toEpgProgramDomainError(error)).toMatchObject({
+      errorCode: "CHANNEL_NOT_FOUND",
+    });
+  });
+
+  it("recognizes but does not expose an EPG not-null violation", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-not-null",
+      name: "Not Null",
+      slug: "not-null",
+    });
+
+    const error = await captureError(prisma.$executeRaw`
+      INSERT INTO "EpgProgram" (
+        "id", "channelId", "programName", "startTime", "endTime", "updatedAt"
+      ) VALUES (
+        'epg-null-name',
+        'channel-not-null',
+        NULL,
+        '2026-07-02T18:00:00.000Z'::timestamptz,
+        '2026-07-02T19:00:00.000Z'::timestamptz,
+        NOW()
+      )
+    `);
+
+    expect(toDatabaseConstraintFailure(error)?.sqlState).toBe("23502");
+    expect(toEpgProgramDomainError(error)).toBeUndefined();
   });
 
   it("rejects unsupported content types at the database layer", async () => {

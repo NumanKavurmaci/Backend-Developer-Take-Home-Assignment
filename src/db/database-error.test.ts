@@ -12,12 +12,17 @@ describe("database error recognition", () => {
     expect(isPrismaErrorCode(error, "P2002")).toBe(false);
   });
 
-  it.each(["P2002", "P2003", "P2024"])(
-    "does not classify %s as a database constraint failure",
-    (code) => {
-      expect(toDatabaseConstraintFailure({ code })).toBeUndefined();
-    },
-  );
+  it.each([
+    ["P2002", "23505"],
+    ["P2003", "23503"],
+    ["P2011", "23502"],
+  ])("normalizes Prisma %s to SQLSTATE %s", (code, sqlState) => {
+    expect(toDatabaseConstraintFailure({ code })?.sqlState).toBe(sqlState);
+  });
+
+  it("does not classify unrelated Prisma failures as constraints", () => {
+    expect(toDatabaseConstraintFailure({ code: "P2024" })).toBeUndefined();
+  });
 
   it("extracts a named constraint from the error message", () => {
     const failure = toDatabaseConstraintFailure({
@@ -28,6 +33,7 @@ describe("database error recognition", () => {
 
     expect(failure).toEqual({
       constraintName: "EpgProgram_no_overlap_excl",
+      sqlState: undefined,
       type: undefined,
     });
   });
@@ -67,6 +73,7 @@ describe("database error recognition", () => {
   it("does not invent details for an unknown P2004 error", () => {
     expect(toDatabaseConstraintFailure({ code: "P2004" })).toEqual({
       constraintName: undefined,
+      sqlState: undefined,
       type: undefined,
     });
   });
@@ -83,6 +90,33 @@ describe("database error recognition", () => {
     ).not.toThrow();
     expect(
       toDatabaseConstraintFailure({ code: "P2004", meta: "invalid" }),
-    ).toEqual({ constraintName: undefined, type: undefined });
+    ).toEqual({
+      constraintName: undefined,
+      sqlState: undefined,
+      type: undefined,
+    });
+  });
+
+  it.each([
+    ["23502", "Not-null violation"],
+    ["23503", "Foreign-key violation"],
+    ["23505", "Unique violation"],
+    ["23P01", "Exclusion violation"],
+    ["23514", "Check violation"],
+  ])("recognizes PostgreSQL SQLSTATE %s without P2004", (sqlState, text) => {
+    const failure = toDatabaseConstraintFailure({
+      message: `${text}; PostgreSQL code: ${sqlState}`,
+    });
+
+    expect(failure?.sqlState).toBe(sqlState);
+  });
+
+  it("recognizes a named constraint without P2004", () => {
+    const failure = toDatabaseConstraintFailure({
+      message:
+        'conflicting key violates exclusion constraint "EpgProgram_no_overlap_excl"',
+    });
+
+    expect(failure?.constraintName).toBe("EpgProgram_no_overlap_excl");
   });
 });
