@@ -12,21 +12,23 @@ jobs:
     name: Quality gate
     runs-on: ubuntu-latest
     env:
-      DATABASE_URL: postgresql://saatcms:saatcms_ci@localhost:5432/saatcms_test?schema=public
+      NODE_ENV: test
+      DATABASE_URL: postgresql://saatcms_ci:saatcms_ci_password@localhost:5432/saatcms_test?schema=public
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18.4-bookworm
         env:
           POSTGRES_DB: saatcms_test
-          POSTGRES_USER: saatcms
-          POSTGRES_PASSWORD: saatcms_ci
+          POSTGRES_USER: saatcms_ci
+          POSTGRES_PASSWORD: saatcms_ci_password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U saatcms -d saatcms_test"
+          --health-cmd "pg_isready -U saatcms_ci -d saatcms_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+          --health-start-period 10s
 
     steps:
       - name: Checkout
@@ -47,7 +49,10 @@ jobs:
       - name: Apply PostgreSQL migrations
         run: npm run db:migrate:deploy
 
-      - name: Verify disposable test database
+      - name: Prove PostgreSQL connection
+        run: npm run db:check
+
+      - name: Database constraint and concurrency tests
         run: npm run db:test
 
       - name: Typecheck

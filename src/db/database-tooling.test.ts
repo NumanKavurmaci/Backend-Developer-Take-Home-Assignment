@@ -52,6 +52,8 @@ describe("PostgreSQL database tooling", () => {
     const result = await runNpmCommand("db:check", process.env.DATABASE_URL);
 
     expect(result.stdout).toContain('"database": "connected"');
+    expect(result.stdout).toContain('"databaseName": "saatcms_test"');
+    expect(result.stdout).toContain('"version": "PostgreSQL');
   });
 
   it("db:migrate:deploy applies migrations without deleting existing data", async () => {
