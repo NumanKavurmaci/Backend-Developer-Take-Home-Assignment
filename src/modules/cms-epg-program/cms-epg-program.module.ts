@@ -12,7 +12,7 @@ export const CmsEpgProgramModule = {
       cmsEpgProgramService,
     );
 
-    // Mounts POST /api/v1/cms/channels/:channelId/epg.
+    // Mounts CMS CRUD routes under /api/v1/cms/channels/:channelId/epg.
     app.route(
       "/api/v1/cms/channels",
       createCmsEpgProgramRoutes(cmsEpgProgramController),

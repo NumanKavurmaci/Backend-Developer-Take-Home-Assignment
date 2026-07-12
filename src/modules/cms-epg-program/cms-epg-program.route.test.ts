@@ -14,7 +14,7 @@ import { CmsEpgProgramService } from "./cms-epg-program.service.js";
 
 const prisma = new PrismaClient();
 
-function createTestApp(service: Pick<CmsEpgProgramService, "createProgram">) {
+function createTestApp(service: Partial<CmsEpgProgramService>) {
   const app = new Hono();
 
   app.onError(errorHandler);
@@ -78,6 +78,132 @@ describe("CMS EPG program API routes", () => {
       programName: "Evening News",
       startTime: "2026-07-02T18:00:00Z",
       endTime: "2026-07-02T19:00:00Z",
+    });
+  });
+
+  it("gets a program from its channel-scoped route", async () => {
+    const getProgram = vi.fn().mockResolvedValue({
+      id: "epg-evening-news",
+      channelId: "channel-saat-news",
+      programName: "Evening News",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+      createdAt: new Date("2026-07-02T17:00:00.000Z"),
+      updatedAt: new Date("2026-07-02T17:00:00.000Z"),
+    });
+
+    const response = await createTestApp({ getProgram }).request(
+      "/api/v1/cms/channels/channel-saat-news/epg/epg-evening-news",
+    );
+
+    expect(response.status).toBe(200);
+    expect(getProgram).toHaveBeenCalledWith(
+      "channel-saat-news",
+      "epg-evening-news",
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      id: "epg-evening-news",
+      startTime: "2026-07-02T18:00:00.000Z",
+    });
+  });
+
+  it("lists a UTC window with page-based pagination", async () => {
+    const listPrograms = vi.fn().mockResolvedValue({
+      items: [],
+      page: 2,
+      pageSize: 10,
+      total: 12,
+    });
+    const response = await createTestApp({ listPrograms }).request(
+      "/api/v1/cms/channels/channel-saat-news/epg?windowStart=2026-07-02T18%3A00%3A00Z&windowEnd=2026-07-02T20%3A00%3A00Z&page=2&pageSize=10",
+    );
+
+    expect(response.status).toBe(200);
+    expect(listPrograms).toHaveBeenCalledWith("channel-saat-news", {
+      windowStart: "2026-07-02T18:00:00Z",
+      windowEnd: "2026-07-02T20:00:00Z",
+      page: "2",
+      pageSize: "10",
+    });
+    await expect(response.json()).resolves.toEqual({
+      items: [],
+      page: 2,
+      pageSize: 10,
+      total: 12,
+    });
+  });
+
+  it("patches a program without accepting route-owned fields", async () => {
+    const updateProgram = vi.fn().mockResolvedValue({
+      id: "epg-evening-news",
+      channelId: "channel-saat-news",
+      programName: "Late News",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+      createdAt: new Date("2026-07-02T17:00:00.000Z"),
+      updatedAt: new Date("2026-07-02T17:30:00.000Z"),
+    });
+    const response = await createTestApp({ updateProgram }).request(
+      "/api/v1/cms/channels/channel-saat-news/epg/epg-evening-news",
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ programName: "Late News" }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateProgram).toHaveBeenCalledWith(
+      "channel-saat-news",
+      "epg-evening-news",
+      { programName: "Late News" },
+    );
+  });
+
+  it("deletes a program with a 204 response", async () => {
+    const deleteProgram = vi.fn().mockResolvedValue(undefined);
+    const response = await createTestApp({ deleteProgram }).request(
+      "/api/v1/cms/channels/channel-saat-news/epg/epg-evening-news",
+      { method: "DELETE" },
+    );
+
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
+    expect(deleteProgram).toHaveBeenCalledWith(
+      "channel-saat-news",
+      "epg-evening-news",
+    );
+  });
+
+  it("returns 404 without revealing a cross-channel program", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-owner",
+      name: "Owner",
+      slug: "owner",
+    });
+    await createLiveChannel(prisma, {
+      id: "channel-other",
+      name: "Other",
+      slug: "other",
+    });
+    await prisma.epgProgram.create({
+      data: {
+        id: "epg-owner-news",
+        channelId: "channel-owner",
+        programName: "Owner News",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      },
+    });
+
+    const response = await createTestApp(new CmsEpgProgramService()).request(
+      "/api/v1/cms/channels/channel-other/epg/epg-owner-news",
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      errorCode: "EPG_PROGRAM_NOT_FOUND",
+      message: "EPG program not found",
     });
   });
 

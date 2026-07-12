@@ -11,3 +11,25 @@ export type CreateEpgProgramInput = {
   startTime: Date;
   endTime: Date;
 };
+
+// PATCH shape. The route owns channelId, so programs cannot move channels.
+export type UpdateEpgProgramInput = {
+  programName?: string;
+  startTime?: Date;
+  endTime?: Date;
+};
+
+export type EpgProgramListOptions = {
+  channelId: string;
+  windowStart: Date;
+  windowEnd: Date;
+  page: number;
+  pageSize: number;
+};
+
+export type EpgProgramPage = {
+  items: EpgProgramRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+};

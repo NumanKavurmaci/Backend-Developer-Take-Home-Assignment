@@ -1,61 +1,197 @@
 import { prisma } from "../../db/client.js";
-import { prepareEpgProgramCreateInput } from "../../live-channel/epg-program/epg-program.js";
-import { createEpgProgramWithConcurrencyLock } from "../../live-channel/epg-program/epg-program-repository.js";
-import { ApiError } from "../../shared/http/api-error.js";
+import {
+  assertValidEpgProgramTimeRange,
+  prepareEpgProgramCreateInput,
+} from "../../live-channel/epg-program/epg-program.js";
+import {
+  createEpgProgramWithConcurrencyLock,
+  deleteEpgProgram,
+  getEpgProgram,
+  listEpgPrograms,
+  updateEpgProgramWithConcurrencyLock,
+} from "../../live-channel/epg-program/epg-program-repository.js";
 import type {
   CreateEpgProgramInput,
+  EpgProgramPage,
   EpgProgramRecord,
+  UpdateEpgProgramInput,
 } from "../../live-channel/epg-program/epg-program-types.js";
+import { ApiError } from "../../shared/http/api-error.js";
 
-type CreateEpgProgramRequestBody = {
-  programName?: unknown;
-  startTime?: unknown;
-  endTime?: unknown;
-};
+type RequestObject = Record<string, unknown>;
+
+const CREATE_FIELDS = ["programName", "startTime", "endTime"] as const;
+const UPDATE_FIELDS = CREATE_FIELDS;
+const LIST_FIELDS = ["windowStart", "windowEnd", "page", "pageSize"] as const;
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 const ISO_DATE_TIME_WITH_TIMEZONE_PATTERN =
   /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|([+-])(\d{2}):(\d{2}))$/;
 
-// Coordinates request validation, channel existence checks, and EPG persistence.
+// Coordinates request validation, route ownership, and EPG persistence.
 export class CmsEpgProgramService {
   async createProgram(
     channelId: string | undefined,
     body: unknown,
   ): Promise<EpgProgramRecord> {
-    const createInput = await buildCreateInput(channelId, body);
+    const createInput = buildCreateInput(channelId, body);
 
     return createEpgProgramWithConcurrencyLock(prisma, createInput);
   }
-}
 
-async function buildCreateInput(
-  channelId: string | undefined,
-  body: unknown,
-): Promise<CreateEpgProgramInput> {
-  if (!channelId || channelId.trim() === "") {
-    throw new ApiError(400, "INVALID_REQUEST", "channelId is required");
+  async getProgram(
+    channelId: string | undefined,
+    programId: string | undefined,
+  ): Promise<EpgProgramRecord> {
+    return getEpgProgram(
+      prisma,
+      readRequiredRouteId(channelId, "channelId"),
+      readRequiredRouteId(programId, "programId"),
+    );
   }
 
-  const requestBody = readRequestBodyObject(body);
+  async listPrograms(
+    channelId: string | undefined,
+    query: unknown,
+  ): Promise<EpgProgramPage> {
+    const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
+    const requestQuery = readRequestObject(query, "Query parameters");
+    assertAllowedFields(requestQuery, LIST_FIELDS);
+
+    const windowStart = readRequiredDate(
+      requestQuery.windowStart,
+      "windowStart",
+    );
+    const windowEnd = readRequiredDate(requestQuery.windowEnd, "windowEnd");
+    assertValidEpgProgramTimeRange(windowStart, windowEnd);
+
+    return listEpgPrograms(prisma, {
+      channelId: normalizedChannelId,
+      windowStart,
+      windowEnd,
+      page: readPositiveInteger(requestQuery.page, "page", DEFAULT_PAGE),
+      pageSize: readPositiveInteger(
+        requestQuery.pageSize,
+        "pageSize",
+        DEFAULT_PAGE_SIZE,
+        MAX_PAGE_SIZE,
+      ),
+    });
+  }
+
+  async updateProgram(
+    channelId: string | undefined,
+    programId: string | undefined,
+    body: unknown,
+  ): Promise<EpgProgramRecord> {
+    const requestBody = readRequestObject(body, "Request body");
+    assertAllowedFields(requestBody, UPDATE_FIELDS);
+
+    if (Object.keys(requestBody).length === 0) {
+      throw new ApiError(
+        400,
+        "INVALID_REQUEST_BODY",
+        "PATCH request body must include at least one mutable field",
+      );
+    }
+
+    const input: UpdateEpgProgramInput = {
+      ...(hasOwn(requestBody, "programName")
+        ? {
+            programName: readRequiredString(
+              requestBody.programName,
+              "programName",
+            ),
+          }
+        : {}),
+      ...(hasOwn(requestBody, "startTime")
+        ? {
+            startTime: readRequiredDate(requestBody.startTime, "startTime"),
+          }
+        : {}),
+      ...(hasOwn(requestBody, "endTime")
+        ? { endTime: readRequiredDate(requestBody.endTime, "endTime") }
+        : {}),
+    };
+
+    return updateEpgProgramWithConcurrencyLock(
+      prisma,
+      readRequiredRouteId(channelId, "channelId"),
+      readRequiredRouteId(programId, "programId"),
+      input,
+    );
+  }
+
+  async deleteProgram(
+    channelId: string | undefined,
+    programId: string | undefined,
+  ): Promise<void> {
+    await deleteEpgProgram(
+      prisma,
+      readRequiredRouteId(channelId, "channelId"),
+      readRequiredRouteId(programId, "programId"),
+    );
+  }
+}
+
+function buildCreateInput(
+  channelId: string | undefined,
+  body: unknown,
+): CreateEpgProgramInput {
+  const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
+  const requestBody = readRequestObject(body, "Request body");
+  assertAllowedFields(requestBody, CREATE_FIELDS);
 
   return prepareEpgProgramCreateInput({
-    channelId,
+    channelId: normalizedChannelId,
     programName: readRequiredString(requestBody.programName, "programName"),
     startTime: readRequiredDate(requestBody.startTime, "startTime"),
     endTime: readRequiredDate(requestBody.endTime, "endTime"),
   });
 }
 
-function readRequestBodyObject(body: unknown): CreateEpgProgramRequestBody {
+function readRequiredRouteId(
+  value: string | undefined,
+  fieldName: string,
+): string {
+  if (!value || value.trim() === "") {
+    throw new ApiError(400, "INVALID_REQUEST", `${fieldName} is required`);
+  }
+
+  return value.trim();
+}
+
+function readRequestObject(body: unknown, label: string): RequestObject {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new ApiError(
       400,
       "INVALID_REQUEST_BODY",
-      "Request body must be a JSON object",
+      `${label} must be a JSON object`,
     );
   }
 
-  return body as CreateEpgProgramRequestBody;
+  return body as RequestObject;
+}
+
+function assertAllowedFields(
+  body: RequestObject,
+  allowedFields: readonly string[],
+): void {
+  const unknownFields = Object.keys(body).filter(
+    (field) => !allowedFields.includes(field),
+  );
+
+  if (unknownFields.length > 0) {
+    throw new ApiError(
+      400,
+      "UNKNOWN_FIELDS",
+      `Unknown field${unknownFields.length === 1 ? "" : "s"}: ${unknownFields
+        .sort()
+        .join(", ")}`,
+    );
+  }
 }
 
 function readRequiredString(value: unknown, fieldName: string): string {
@@ -91,6 +227,44 @@ function readRequiredDate(value: unknown, fieldName: string): Date {
   return date;
 }
 
+function readPositiveInteger(
+  value: unknown,
+  fieldName: string,
+  defaultValue: number,
+  maximum?: number,
+): number {
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+    throw new ApiError(
+      400,
+      "INVALID_PAGINATION",
+      `${fieldName} must be a positive integer`,
+    );
+  }
+
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new ApiError(
+      400,
+      "INVALID_PAGINATION",
+      `${fieldName} must be a positive integer`,
+    );
+  }
+
+  if (maximum !== undefined && parsed > maximum) {
+    throw new ApiError(
+      400,
+      "INVALID_PAGINATION",
+      `${fieldName} must be at most ${maximum}`,
+    );
+  }
+
+  return parsed;
+}
+
 function hasValidDateTimeParts(match: RegExpExecArray): boolean {
   const year = Number(match[1]);
   const month = Number(match[2]);
@@ -118,4 +292,8 @@ function hasValidDateTimeParts(match: RegExpExecArray): boolean {
     calendarDate.getUTCMonth() === month - 1 &&
     calendarDate.getUTCDate() === day
   );
+}
+
+function hasOwn(body: RequestObject, field: string): boolean {
+  return Object.prototype.hasOwnProperty.call(body, field);
 }

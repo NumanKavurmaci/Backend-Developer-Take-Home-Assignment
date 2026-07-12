@@ -1,4 +1,7 @@
-import type { CreateEpgProgramInput } from "./epg-program-types.js";
+import type {
+  CreateEpgProgramInput,
+  UpdateEpgProgramInput,
+} from "./epg-program-types.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 
 export function normalizeEpgProgramName(programName: string): string {
@@ -64,5 +67,30 @@ export function prepareEpgProgramCreateInput(
     programName: normalizeEpgProgramName(input.programName),
     startTime: input.startTime,
     endTime: input.endTime,
+  };
+}
+
+export function prepareEpgProgramUpdateInput(
+  current: CreateEpgProgramInput,
+  input: UpdateEpgProgramInput,
+): UpdateEpgProgramInput {
+  const programName =
+    input.programName === undefined
+      ? current.programName
+      : normalizeEpgProgramName(input.programName);
+  const startTime = input.startTime ?? current.startTime;
+  const endTime = input.endTime ?? current.endTime;
+
+  assertValidEpgProgramInput({
+    channelId: current.channelId,
+    programName,
+    startTime,
+    endTime,
+  });
+
+  return {
+    ...(input.programName !== undefined ? { programName } : {}),
+    ...(input.startTime !== undefined ? { startTime } : {}),
+    ...(input.endTime !== undefined ? { endTime } : {}),
   };
 }

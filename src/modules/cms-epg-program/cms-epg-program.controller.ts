@@ -16,6 +16,44 @@ export class CmsEpgProgramController {
 
     return c.json(program, 201);
   }
+
+  async getProgram(c: Context) {
+    const program = await this.cmsEpgProgramService.getProgram(
+      c.req.param("channelId"),
+      c.req.param("programId"),
+    );
+
+    return c.json(program);
+  }
+
+  async listPrograms(c: Context) {
+    const page = await this.cmsEpgProgramService.listPrograms(
+      c.req.param("channelId"),
+      c.req.query(),
+    );
+
+    return c.json(page);
+  }
+
+  async updateProgram(c: Context) {
+    const body = await readJsonBody(c);
+    const program = await this.cmsEpgProgramService.updateProgram(
+      c.req.param("channelId"),
+      c.req.param("programId"),
+      body,
+    );
+
+    return c.json(program);
+  }
+
+  async deleteProgram(c: Context) {
+    await this.cmsEpgProgramService.deleteProgram(
+      c.req.param("channelId"),
+      c.req.param("programId"),
+    );
+
+    return c.body(null, 204);
+  }
 }
 
 async function readJsonBody(c: Context): Promise<unknown> {
