@@ -65,7 +65,7 @@ describe("database schema readiness", () => {
         `CREATE TABLE "${schemaName}"."_prisma_migrations" (migration_name text, finished_at timestamptz, rolled_back_at timestamptz)`,
       );
       await prisma.$executeRawUnsafe(
-        `INSERT INTO "${schemaName}"."_prisma_migrations" VALUES ('20260712000000_harden_epg_integrity', now(), NULL)`,
+        `INSERT INTO "${schemaName}"."_prisma_migrations" VALUES ('20260712220000_add_content_catalog_fields', now(), NULL)`,
       );
       await prisma.$executeRawUnsafe(
         rolledBack

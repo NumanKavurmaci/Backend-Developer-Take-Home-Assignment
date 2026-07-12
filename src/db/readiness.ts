@@ -2,7 +2,8 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 
 type QueryClient = PrismaClient | Prisma.TransactionClient;
 
-export const LATEST_EXPECTED_MIGRATION = "20260712000000_harden_epg_integrity";
+export const LATEST_EXPECTED_MIGRATION =
+  "20260712220000_add_content_catalog_fields";
 const REQUIRED_RELATIONS = [
   "Content",
   "ContentGeoBlockCountry",

@@ -81,6 +81,20 @@ describe("PostgreSQL database tooling", () => {
     }
   }, 30_000);
 
+  it("keeps the migrated database consistent with the Prisma schema", async () => {
+    const result = await runPrismaCommand([
+      "migrate",
+      "diff",
+      "--from-url",
+      process.env.DATABASE_URL!,
+      "--to-schema-datamodel",
+      path.join(rootDir, "prisma", "schema.prisma"),
+      "--exit-code",
+    ]);
+
+    expect(result.stdout).toContain("No difference detected");
+  }, 30_000);
+
   it("db:check fails with an invalid PostgreSQL connection", async () => {
     await expect(
       runNpmCommand(
@@ -125,5 +139,21 @@ function runNpmCommand(script: string, databaseUrl: string | undefined) {
     cwd: rootDir,
     env: { ...process.env, DATABASE_URL: databaseUrl },
     timeout: 15_000,
+  });
+}
+
+function runPrismaCommand(argumentsList: string[]) {
+  const prismaCliPath = path.join(
+    rootDir,
+    "node_modules",
+    "prisma",
+    "build",
+    "index.js",
+  );
+
+  return execFileAsync(process.execPath, [prismaCliPath, ...argumentsList], {
+    cwd: rootDir,
+    env: process.env,
+    timeout: 30_000,
   });
 }

@@ -31,7 +31,7 @@ The database has two main areas:
 
 | Area             | Tables                                         | Purpose                                                                        |
 | ---------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
-| Content metadata | `Content`, `ContentGeoBlockCountry`            | Stores the content tree and inherited playback metadata.                       |
+| Content metadata | `Content`, `ContentGeoBlockCountry`            | Stores the content tree, provider facts, and inherited playback metadata.       |
 | Live scheduling  | `LiveChannel`, `EpgProgram`, `EpgScheduleLock` | Stores channels, schedules, and the per-channel lock used for safe EPG writes. |
 
 ## PostgreSQL Column Types
@@ -42,6 +42,11 @@ The database has two main areas:
 | `isPremium`, `geoBlockCountriesOverride`         | `BOOLEAN`                 | Native true/false values                           |
 | `version`                                        | `INTEGER`                 | Lock-row update counter                            |
 | `createdAt`, `updatedAt`, `startTime`, `endTime` | `TIMESTAMPTZ(3)`          | Millisecond timestamps stored as absolute instants |
+| Catalog premiere and end dates                    | `DATE`                    | Provider calendar dates without local-time semantics |
+| `runtimeMinutes`, season and episode numbers      | `INTEGER`                 | Whole-number catalog facts                      |
+| `ratingAverage`                                   | `DOUBLE PRECISION`        | Provider rating value                           |
+| `genres`                                          | `TEXT[]`                  | Non-inheritable provider classifications        |
+| `sourceMetadata`                                  | `JSONB`                   | Exceptional source facts without normalized columns |
 
 Primary keys, composite keys, indexes, foreign keys, and checks are created by
 the committed Prisma SQL migrations. Parent content uses `ON DELETE RESTRICT`;
@@ -108,6 +113,23 @@ Hierarchy validation lives in the content domain layer:
 | `MOVIE`      | none         |
 
 Invalid combinations are rejected before writing to the database. For example, an `EPISODE` cannot be created directly under a `SERIES`.
+
+### Source Catalog Facts
+
+The following fields belong to the imported provider record and never inherit
+from a parent: `source`, `sourceId`, `sourceUrl`, `originalTitle`, `summary`,
+`language`, `status`, `countryCode`, `networkName`, `officialSiteUrl`,
+`imageUrl`, `premieredAt`, `endedAt`, `runtimeMinutes`, `seasonNumber`,
+`episodeNumber`, `ratingAverage`, `genres`, and the optional compact
+`sourceMetadata` object.
+
+`genre` and `genres` deliberately have different ownership. Singular `genre`
+is a SaatCMS playback-policy field and follows inheritance. Array `genres`
+contains provider classifications from that exact Content row and defaults to
+an empty array. The nullable `(source, sourceId)` identity is unique when both
+values are present; PostgreSQL still permits multiple local rows with null
+source identities. Its unique index also supports source lookups. Large text,
+URL, array, and JSON fields are not indexed.
 
 Ancestor path queries are loaded with one recursive PostgreSQL query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
 
