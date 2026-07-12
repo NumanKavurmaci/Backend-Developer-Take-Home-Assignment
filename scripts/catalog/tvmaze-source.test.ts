@@ -52,6 +52,22 @@ describe("TVmaze endpoint source", () => {
     expect(error.message).toContain("TVmaze show-page-0 returned malformed data");
     expect(error.message).not.toContain("secret-response-body");
   });
+
+  it("maps omitted optional provider fields to null or empty arrays", async () => {
+    const source = new HttpTvMazeCatalogSource({
+      getJson: vi.fn(async () => [{ id: 1, name: "Sparse Show" }]),
+    } as unknown as CachedJsonClient);
+    await expect(source.getShowPage(0)).resolves.toMatchObject([{
+      id: 1,
+      name: "Sparse Show",
+      premiered: null,
+      runtime: null,
+      rating: { average: null },
+      genres: [],
+      network: null,
+      image: null,
+    }]);
+  });
 });
 
 async function captureError(promise: Promise<unknown>): Promise<Error> {

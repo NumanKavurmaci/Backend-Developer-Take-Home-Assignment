@@ -40,10 +40,10 @@ export function normalizeTvMazeShow(show: TvMazeShow, policies?: SaatCmsPolicies
       networkName: sanitizePlainText(network?.name ?? null),
       officialSiteUrl: show.officialSite,
       imageUrl: imageUrl(show.image),
-      premieredAt: show.premiered,
-      endedAt: show.ended,
-      runtimeMinutes: show.runtime,
-      ratingAverage: show.rating.average,
+      premieredAt: normalizeOptionalDate(show.premiered),
+      endedAt: normalizeOptionalDate(show.ended),
+      runtimeMinutes: normalizeOptionalPositiveInteger(show.runtime),
+      ratingAverage: normalizeOptionalRating(show.rating.average),
       genres: normalizeGenres(show.genres),
     }),
     policies: { ...(policies ?? EMPTY_SAATCMS_POLICIES) },
@@ -71,8 +71,8 @@ export function normalizeTvMazeSeason(
       countryCode: normalizeCountryCode(network?.country?.code ?? null),
       networkName: sanitizePlainText(network?.name ?? null),
       imageUrl: imageUrl(season.image),
-      premieredAt: season.premiereDate,
-      endedAt: season.endDate,
+      premieredAt: normalizeOptionalDate(season.premiereDate),
+      endedAt: normalizeOptionalDate(season.endDate),
       seasonNumber: season.number,
     }),
     policies: { ...(policies ?? EMPTY_SAATCMS_POLICIES) },
@@ -126,11 +126,11 @@ export function normalizeTvMazeEpisode(
       originalTitle: title,
       summary: sanitizePlainText(episode.summary),
       imageUrl: imageUrl(episode.image),
-      premieredAt: episode.airdate,
-      runtimeMinutes: episode.runtime,
+      premieredAt: normalizeOptionalDate(episode.airdate),
+      runtimeMinutes: normalizeOptionalPositiveInteger(episode.runtime),
       seasonNumber: episode.season,
       episodeNumber: episode.number,
-      ratingAverage: episode.rating.average,
+      ratingAverage: normalizeOptionalRating(episode.rating.average),
       sourceMetadata: episode.type === null ? null : { episodeType: episode.type },
     }),
     policies: { ...(policies ?? EMPTY_SAATCMS_POLICIES) },
@@ -179,7 +179,35 @@ function requiredPlainText(value: string, kind: string): string {
 }
 
 function normalizeCountryCode(value: string | null): string | null {
-  return value === null ? null : value.trim().toUpperCase();
+  if (value === null) return null;
+  const normalized = value.trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+}
+
+function normalizeOptionalDate(value: string | null): string | null {
+  if (value === null) return null;
+  const normalized = value.trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match === null) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+    ? normalized
+    : null;
+}
+
+function normalizeOptionalPositiveInteger(value: number | null): number | null {
+  return value !== null && Number.isSafeInteger(value) && value > 0 ? value : null;
+}
+
+function normalizeOptionalRating(value: number | null): number | null {
+  return value !== null && Number.isFinite(value) && value >= 0 && value <= 10
+    ? value
+    : null;
 }
 
 function normalizeGenres(values: string[]): string[] {

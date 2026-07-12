@@ -38,7 +38,11 @@ human-readable provider strings are converted to compact plain text: markup and
 script/style content are removed, entities are decoded, and whitespace is
 normalized. Genres are sanitized, deduplicated, and sorted.
 
-Calendar dates must be real `YYYY-MM-DD` values. Ratings must be finite values
-from 0 through 10. Runtime, season, and episode numbers must be positive
-integers when present. Invalid included records reject normalization rather than
-inventing or silently correcting source facts.
+Optional provider metadata is best-effort and must not discard a valid
+hierarchy. Empty or invalid calendar dates become null. Ratings outside 0–10,
+non-positive/non-integer runtimes, and malformed country codes also become
+null. Artifact validation remains strict, so invalid values can never pass
+through after normalization. Structural data is different: invalid IDs, blank
+required titles, conflicting identities, invalid Season numbering, or broken
+parents still reject or skip records because nulling those values would corrupt
+the hierarchy.

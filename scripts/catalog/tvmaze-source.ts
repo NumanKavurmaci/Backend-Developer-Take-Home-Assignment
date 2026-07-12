@@ -115,17 +115,18 @@ function decodeEpisode(value: Record<string, unknown>): TvMazeEpisode {
 }
 
 function rating(value: unknown): TvMazeRating {
+  if (value === null || value === undefined) return { average: null };
   const item = record(value, "rating");
   return { average: nullableNumber(item.average, "rating.average") };
 }
 
 function nullableNetwork(value: unknown, label: string): TvMazeNetwork | null {
-  if (value === null) return null;
+  if (value === null || value === undefined) return null;
   const item = record(value, label);
   return {
     name: string(item.name, `${label}.name`),
     country:
-      item.country === null
+      item.country === null || item.country === undefined
         ? null
         : {
             code: nullableString(
@@ -137,7 +138,7 @@ function nullableNetwork(value: unknown, label: string): TvMazeNetwork | null {
 }
 
 function nullableImage(value: unknown): TvMazeImage | null {
-  if (value === null) return null;
+  if (value === null || value === undefined) return null;
   const item = record(value, "image");
   return {
     medium: nullableString(item.medium, "image.medium"),
@@ -158,7 +159,7 @@ function string(value: unknown, label: string): string {
 }
 
 function nullableString(value: unknown, label: string): string | null {
-  if (value === null) return null;
+  if (value === null || value === undefined) return null;
   return string(value, label);
 }
 
@@ -170,11 +171,12 @@ function number(value: unknown, label: string): number {
 }
 
 function nullableNumber(value: unknown, label: string): number | null {
-  if (value === null) return null;
+  if (value === null || value === undefined) return null;
   return number(value, label);
 }
 
 function stringArray(value: unknown, label: string): string[] {
+  if (value === null || value === undefined) return [];
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new Error(`${label} must be a string array`);
   }

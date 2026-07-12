@@ -221,11 +221,14 @@ describe("TVmaze hierarchy normalization", () => {
   });
 
   it.each([
-    ["date", { premiered: "2020-02-30" }, /Invalid premieredAt/],
-    ["runtime", { runtime: 0 }, /Invalid runtimeMinutes/],
-    ["rating", { rating: { average: 11 } }, /Invalid rating/],
-  ])("rejects invalid %s values predictably", (_label, showOverride, expected) => {
-    expect(() => normalizeTvMazeHierarchy(snapshot({ show: { ...show, ...showOverride } }))).toThrow(expected);
+    ["date", { premiered: "2020-02-30" }, "premieredAt"],
+    ["empty date", { premiered: "" }, "premieredAt"],
+    ["runtime", { runtime: 0 }, "runtimeMinutes"],
+    ["rating", { rating: { average: 11 } }, "ratingAverage"],
+    ["country", { network: { name: "Network", country: { code: "USA" } } }, "countryCode"],
+  ])("normalizes invalid optional %s values to null", (_label, showOverride, field) => {
+    const result = normalized(snapshot({ show: { ...show, ...showOverride } }));
+    expect(result.chunk.content[0]!.sourceFacts[field as keyof typeof result.chunk.content[0]["sourceFacts"]]).toBeNull();
   });
 
   it("returns the same normalized order for shuffled provider responses", () => {
