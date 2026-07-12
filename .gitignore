@@ -12,6 +12,7 @@ dist/
 coverage/
 tmp/
 .cache/
+data/catalog/
 
 # OS/editor noise
 .DS_Store

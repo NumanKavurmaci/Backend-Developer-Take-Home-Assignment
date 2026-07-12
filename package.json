@@ -29,7 +29,8 @@
     "deploy:smoke": "tsx scripts/deployment-smoke.ts",
     "deploy:setup": "npm run db:migrate:deploy && npm run db:check && npm run db:seed && npm run db:seed:verify && npm run deploy:smoke",
     "test:isolation": "tsx scripts/test-concurrent-isolation.ts",
-    "catalog:measure": "tsx scripts/catalog/measure-database.ts"
+    "catalog:measure": "tsx scripts/catalog/measure-database.ts",
+    "catalog:validate": "tsx scripts/catalog/validate-artifact.ts"
   },
   "engines": {
     "node": ">=24 <25"
