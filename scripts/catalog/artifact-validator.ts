@@ -80,6 +80,30 @@ export async function validateCatalogArtifact(
   return { manifest, contentIdsRetained: contentResult.typesById.size };
 }
 
+/** Streams previously validated Content rows without retaining row objects. */
+export async function* streamArtifactContentRows(
+  artifactDirectory: string,
+): AsyncGenerator<ArtifactContentRow> {
+  const filePath = path.join(path.resolve(artifactDirectory), CONTENT_ARTIFACT_FILE);
+  let rowNumber = 0;
+  for await (const line of ndjsonLines(filePath)) {
+    rowNumber += 1;
+    yield parseContentRow(line, rowNumber);
+  }
+}
+
+/** Streams previously validated geo-block rows without retaining row objects. */
+export async function* streamArtifactGeoBlockRows(
+  artifactDirectory: string,
+): AsyncGenerator<ArtifactGeoBlockRow> {
+  const filePath = path.join(path.resolve(artifactDirectory), GEO_BLOCKS_ARTIFACT_FILE);
+  let rowNumber = 0;
+  for await (const line of ndjsonLines(filePath)) {
+    rowNumber += 1;
+    yield parseGeoBlockRow(line, rowNumber);
+  }
+}
+
 async function readManifest(filePath: string): Promise<unknown> {
   try {
     return JSON.parse(await readFile(filePath, "utf8")) as unknown;
@@ -273,8 +297,9 @@ function compareContent(left: ArtifactContentRow, right: ArtifactContentRow): nu
 }
 
 function typeRank(type: ArtifactContentRow["type"]): number {
-  if (type === "SERIES" || type === "MOVIE") return 0;
-  return type === "SEASON" ? 1 : 2;
+  if (type === "SERIES") return 0;
+  if (type === "MOVIE") return 1;
+  return type === "SEASON" ? 2 : 3;
 }
 
 function compareGeoBlocks(left: ArtifactGeoBlockRow, right: ArtifactGeoBlockRow): number {

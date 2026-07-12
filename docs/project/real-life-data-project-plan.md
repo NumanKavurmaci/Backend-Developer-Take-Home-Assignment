@@ -795,12 +795,14 @@ Final names may change during implementation, but responsibilities should remain
 ```text
 npm run catalog:build
 npm run catalog:validate
-npm run catalog:load:local
-npm run catalog:load:render -- --confirm-replace-content
+npm run catalog:load
 npm run catalog:verify
 ```
 
-`catalog:build` is the only command that contacts external providers. `catalog:load:*` consumes an existing artifact. `catalog:verify` is read-only.
+`catalog:build` is the only command that contacts external providers.
+`catalog:load` consumes an existing artifact and selects its guarded local or
+Render target through explicit environment configuration. `catalog:verify` is
+read-only.
 
 ## Recommended Delivery Order
 

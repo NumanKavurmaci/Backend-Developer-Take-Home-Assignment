@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { validateDestructiveDatabaseTarget } from "./destructive-operation-guard.js";
+import {
+  validateCatalogLoadTarget,
+  validateDestructiveDatabaseTarget,
+} from "./destructive-operation-guard.js";
 
 const localUrl =
   "postgresql://user:password@localhost:5432/saatcms?schema=public";
@@ -85,5 +88,47 @@ describe("destructive database operation guard", () => {
     ).toThrow(
       "DEMO_DATABASE_CONFIRMATION=private-db/provider_generated_name/public",
     );
+  });
+});
+
+describe("catalog load target guard", () => {
+  it("requires a separately supplied catalog database URL", () => {
+    expect(() => validateCatalogLoadTarget({
+      DATABASE_URL: localUrl,
+      CATALOG_DATABASE_TARGET: "local",
+      NODE_ENV: "development",
+    })).toThrow(/CATALOG_DATABASE_URL/);
+  });
+
+  it("accepts a guarded local catalog target", () => {
+    expect(validateCatalogLoadTarget({
+      CATALOG_DATABASE_URL: localUrl,
+      CATALOG_DATABASE_TARGET: "local",
+      NODE_ENV: "development",
+    })).toEqual({
+      databaseName: "saatcms",
+      schemaName: "public",
+      databaseUrl: localUrl,
+      targetKind: "local",
+    });
+  });
+
+  it("requires exact database and host identity for Render", () => {
+    const renderUrl = "postgresql://user:secret@oregon-postgres.render.com/provider_db?schema=public";
+    const environment = {
+      CATALOG_DATABASE_URL: renderUrl,
+      CATALOG_DATABASE_TARGET: "render",
+    };
+    expect(() => validateCatalogLoadTarget(environment)).toThrow(
+      /CATALOG_EXPECTED_DATABASE=provider_db/,
+    );
+    expect(validateCatalogLoadTarget({
+      ...environment,
+      CATALOG_EXPECTED_DATABASE: "provider_db",
+      CATALOG_RENDER_CONFIRMATION: "oregon-postgres.render.com/provider_db/public",
+    })).toMatchObject({
+      databaseName: "provider_db",
+      targetKind: "render",
+    });
   });
 });

@@ -219,9 +219,10 @@ function compareNormalizedContent(left: NormalizedContentRow, right: NormalizedC
 }
 
 function typeRank(type: NormalizedContentRow["type"]): number {
-  if (type === "SERIES" || type === "MOVIE") return 0;
-  if (type === "SEASON") return 1;
-  return 2;
+  if (type === "SERIES") return 0;
+  if (type === "MOVIE") return 1;
+  if (type === "SEASON") return 2;
+  return 3;
 }
 
 function compareGeoBlocks(left: ArtifactGeoBlockRow, right: ArtifactGeoBlockRow): number {
