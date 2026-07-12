@@ -25,6 +25,7 @@ const securityOptions: CmsSecurityOptions = {
   ],
   authenticationAttemptLimitPerMinute: 20,
   maxBodyBytes: 128,
+  mutationsEnabled: true,
   rateLimitPerMinute: 10,
 };
 
@@ -87,6 +88,7 @@ describe("CMS security configuration", () => {
       credentials: [],
       authenticationAttemptLimitPerMinute: 300,
       maxBodyBytes: 1024 * 1024,
+      mutationsEnabled: true,
       rateLimitPerMinute: 120,
     });
     expect(() =>
@@ -101,6 +103,9 @@ describe("CMS security configuration", () => {
     expect(() =>
       readCmsSecurityOptions({ CMS_MAX_BODY_BYTES: "10485761" }),
     ).toThrow(/at most/);
+    expect(() =>
+      readCmsSecurityOptions({ CMS_MUTATIONS_ENABLED: "yes" }),
+    ).toThrow(/CMS_MUTATIONS_ENABLED/);
   });
 });
 
@@ -174,6 +179,26 @@ describe("CMS authentication and authorization", () => {
     expect(editorDelete.status).toBe(403);
     expect(adminDelete.status).toBe(204);
     expect(editorEpgDelete.status).toBe(204);
+  });
+
+  it("can disable mutations without disabling CMS reads", async () => {
+    const app = createSecurityTestApp({
+      ...securityOptions,
+      mutationsEnabled: false,
+    });
+    const read = await app.request("/api/v1/cms/content", {
+      headers: bearer(readerToken),
+    });
+    const write = await app.request("/api/v1/cms/content", {
+      method: "POST",
+      headers: bearer(editorToken),
+    });
+
+    expect(read.status).toBe(200);
+    expect(write.status).toBe(503);
+    await expect(write.json()).resolves.toMatchObject({
+      errorCode: "CMS_MUTATIONS_DISABLED",
+    });
   });
 
   it("limits requests per actor and reports retry timing", async () => {

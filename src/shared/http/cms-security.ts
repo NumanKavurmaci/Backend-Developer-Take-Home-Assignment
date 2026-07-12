@@ -27,6 +27,7 @@ export type CmsSecurityOptions = {
   credentials: CmsCredential[];
   authenticationAttemptLimitPerMinute: number;
   maxBodyBytes: number;
+  mutationsEnabled: boolean;
   rateLimitPerMinute: number;
 };
 
@@ -105,6 +106,10 @@ export function registerCmsSecurity(
       options.credentials.length || 1,
     ),
   );
+  app.use(
+    "/api/v1/cms/*",
+    cmsMutationGateMiddleware(options.mutationsEnabled),
+  );
 }
 
 export function readCmsSecurityOptions(
@@ -123,6 +128,11 @@ export function readCmsSecurityOptions(
       1024 * 1024,
       "CMS_MAX_BODY_BYTES",
       MAX_BODY_BYTES,
+    ),
+    mutationsEnabled: readBoolean(
+      environment.CMS_MUTATIONS_ENABLED,
+      true,
+      "CMS_MUTATIONS_ENABLED",
     ),
     rateLimitPerMinute: readPositiveInteger(
       environment.CMS_RATE_LIMIT_PER_MINUTE,
@@ -305,6 +315,25 @@ function cmsRateLimitMiddleware(
   };
 }
 
+function cmsMutationGateMiddleware(enabled: boolean): MiddlewareHandler {
+  return async (c, next) => {
+    if (
+      !enabled &&
+      c.req.method !== "GET" &&
+      c.req.method !== "HEAD" &&
+      c.req.method !== "OPTIONS"
+    ) {
+      throw new ApiError(
+        503,
+        "CMS_MUTATIONS_DISABLED",
+        "CMS mutations are temporarily disabled.",
+      );
+    }
+
+    await next();
+  };
+}
+
 function cmsAuditMiddleware(): MiddlewareHandler {
   return async (c, next) => {
     let thrownError: unknown;
@@ -368,6 +397,26 @@ function readPositiveInteger(
   }
 
   return parsed;
+}
+
+function readBoolean(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined || value.trim() === "") {
+    return fallback;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`${name} must be true or false.`);
 }
 
 function readBearerToken(authorization: string | undefined): string | undefined {

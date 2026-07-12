@@ -239,6 +239,7 @@ describe("Hono app scaffold", () => {
         credentials: [],
         authenticationAttemptLimitPerMinute: 10,
         maxBodyBytes: 1024,
+        mutationsEnabled: true,
         rateLimitPerMinute: 10,
       },
     }).request("/api/v1/cms/content");
@@ -261,6 +262,7 @@ describe("Hono app scaffold", () => {
       ],
       authenticationAttemptLimitPerMinute: 10,
       maxBodyBytes: 1024,
+      mutationsEnabled: true,
       rateLimitPerMinute: 10,
     };
     const response = await createApp({ cmsSecurity }).request(
