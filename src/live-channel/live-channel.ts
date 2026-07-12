@@ -1,4 +1,8 @@
-import type { CreateLiveChannelInput } from "./live-channel-types.js";
+import { DomainError } from "../shared/domain/domain-error.js";
+import type {
+  CreateLiveChannelInput,
+  UpdateLiveChannelInput,
+} from "./live-channel-types.js";
 
 const LIVE_CHANNEL_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -17,15 +21,22 @@ export function assertValidLiveChannelInput(
   const slug = normalizeLiveChannelSlug(input.slug);
 
   if (!name) {
-    throw new Error("Live channel name is required");
+    throw new DomainError(
+      "INVALID_LIVE_CHANNEL",
+      "Live channel name is required",
+    );
   }
 
   if (!slug) {
-    throw new Error("Live channel slug is required");
+    throw new DomainError(
+      "INVALID_LIVE_CHANNEL",
+      "Live channel slug is required",
+    );
   }
 
   if (!LIVE_CHANNEL_SLUG_PATTERN.test(slug)) {
-    throw new Error(
+    throw new DomainError(
+      "INVALID_LIVE_CHANNEL",
       "Live channel slug must contain lowercase letters, numbers, and hyphens only",
     );
   }
@@ -41,4 +52,52 @@ export function prepareLiveChannelCreateInput(
     name: normalizeLiveChannelName(input.name),
     slug: normalizeLiveChannelSlug(input.slug),
   };
+}
+
+export function prepareLiveChannelUpdateInput(
+  input: UpdateLiveChannelInput,
+): UpdateLiveChannelInput {
+  const prepared: UpdateLiveChannelInput = {};
+
+  if (input.name !== undefined) {
+    const name = normalizeLiveChannelName(input.name);
+
+    if (!name) {
+      throw new DomainError(
+        "INVALID_LIVE_CHANNEL",
+        "Live channel name is required",
+      );
+    }
+
+    prepared.name = name;
+  }
+
+  if (input.slug !== undefined) {
+    const slug = normalizeLiveChannelSlug(input.slug);
+
+    if (!slug) {
+      throw new DomainError(
+        "INVALID_LIVE_CHANNEL",
+        "Live channel slug is required",
+      );
+    }
+
+    if (!LIVE_CHANNEL_SLUG_PATTERN.test(slug)) {
+      throw new DomainError(
+        "INVALID_LIVE_CHANNEL",
+        "Live channel slug must contain lowercase letters, numbers, and hyphens only",
+      );
+    }
+
+    prepared.slug = slug;
+  }
+
+  if (Object.keys(prepared).length === 0) {
+    throw new DomainError(
+      "INVALID_REQUEST_BODY",
+      "PATCH request body must include at least one mutable field",
+    );
+  }
+
+  return prepared;
 }
