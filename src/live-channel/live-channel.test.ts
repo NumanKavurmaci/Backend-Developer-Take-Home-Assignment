@@ -537,7 +537,7 @@ describe("live channel repository", () => {
       slug: "saat-news",
     });
 
-    const clients = Array.from({ length: 3 }, () =>
+    const clients = Array.from({ length: 12 }, () =>
       createIndependentPrismaClient(),
     );
     const results = await Promise.allSettled(
@@ -566,6 +566,18 @@ describe("live channel repository", () => {
 
     expect(programs).toHaveLength(1);
     expectNoOverlappingPrograms(programs);
+
+    const overlaps = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) AS count
+      FROM "EpgProgram" first_program
+      JOIN "EpgProgram" second_program
+        ON first_program."channelId" = second_program."channelId"
+       AND first_program.id < second_program.id
+       AND first_program."startTime" < second_program."endTime"
+       AND first_program."endTime" > second_program."startTime"
+    `;
+
+    expect(overlaps[0]?.count).toBe(0n);
   }, 20_000);
 
   it("keeps concurrent same-time writes isolated across independent channel clients", async () => {

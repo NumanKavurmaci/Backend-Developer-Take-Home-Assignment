@@ -1,6 +1,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { prepareEpgProgramCreateInput } from "./epg-program.js";
+import { toEpgProgramDomainError } from "./epg-program-error-mapper.js";
 import type {
   CreateEpgProgramInput,
   EpgProgramRecord,
@@ -15,15 +16,19 @@ export async function createEpgProgram(
   const data = prepareEpgProgramCreateInput(input);
   await assertNoOverlappingEpgProgram(prisma, data);
 
-  return prisma.epgProgram.create({
-    data: {
-      id: data.id,
-      channelId: data.channelId,
-      programName: data.programName,
-      startTime: data.startTime,
-      endTime: data.endTime,
-    },
-  });
+  try {
+    return await prisma.epgProgram.create({
+      data: {
+        id: data.id,
+        channelId: data.channelId,
+        programName: data.programName,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      },
+    });
+  } catch (error) {
+    throw toEpgProgramDomainError(error) ?? error;
+  }
 }
 
 /**

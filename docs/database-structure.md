@@ -1,24 +1,12 @@
 # Database Structure
 
-The project uses SQLite with Prisma.
-
-The local database file is created here:
-
-```text
-data/dev.db
-```
-
-The database URL is defined in `.env`:
-
-```env
-DATABASE_URL="file:../data/dev.db"
-```
-
-Prisma resolves this path from the `prisma/` folder.
+The project uses PostgreSQL through Prisma. The local Docker Compose setup
+provides the development database `saatcms` and the disposable test database
+`saatcms_test`.
 
 ## What The Database Needs To Support
 
-The assignment has three main data problems:
+The assignment has four main data problems:
 
 - Content can be nested as `Series -> Season -> Episode`.
 - Some metadata can be inherited from a parent item.
@@ -108,7 +96,7 @@ Hierarchy validation lives in the content domain layer:
 
 Invalid combinations are rejected before writing to the database. For example, an `EPISODE` cannot be created directly under a `SERIES`.
 
-Ancestor path queries are loaded with one recursive SQLite query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
+Ancestor path queries are loaded with one recursive PostgreSQL query instead of one query per hierarchy level. This avoids N+1-style parent lookups while still detecting corrupted cyclic hierarchy data.
 
 ### Inherited Metadata
 
@@ -139,7 +127,7 @@ Allowed `quality` values:
 - `HD`
 - `UHD_4K`
 
-SQLite stores `type` and `quality` as strings. The application code validates the allowed values before saving data, and the database also has `CHECK` constraints so unsupported values are rejected if another script bypasses the domain layer.
+PostgreSQL stores `type` and `quality` as strings. The application code validates the allowed values before saving data, and the database also has `CHECK` constraints so unsupported values are rejected if another script bypasses the domain layer.
 
 The assignment calls this field `premium`; the code stores it as `isPremium` so the boolean meaning is clear.
 
@@ -223,9 +211,11 @@ Important fields:
 
 EPG validation is always scoped to one channel.
 
-### `EpgProgram`
+### EPG integrity and concurrency
 
-Stores scheduled programs for a live channel.
+`EpgProgram` stores scheduled programs for a live channel. `EpgScheduleLock`
+stores one lock row for each channel. Together, application logic and
+PostgreSQL protect the schedule.
 
 Important fields:
 
@@ -238,44 +228,37 @@ Important fields:
 
 Seeded EPG schedules use explicit ISO UTC strings ending in `Z`. The seed script validates this convention before converting values to `Date` objects, so sample data cannot accidentally depend on the server's local timezone.
 
-Invalid ranges must be rejected:
+Two simple rules define a valid schedule:
 
-```text
-startTime >= endTime
-```
+- A program must start before it ends.
+- Programs on the same channel must not overlap.
 
-The application validates this before persistence, and the database also enforces `startTime < endTime` with a `CHECK` constraint.
+Back-to-back programs such as `10:00–11:00` and `11:00–12:00` are valid. The
+same time range is also valid on different channels.
 
-Overlap is checked with this rule:
+When the API creates a program, it uses this transaction:
 
-```text
-newStart < existingEnd AND newEnd > existingStart
-```
+1. Update the target channel's lock row.
+2. Check for an overlapping program on that channel.
+3. Insert the program.
+4. Commit.
 
-This means back-to-back programs are allowed:
+Requests for the same channel update the same lock row and therefore run one
+after another. Requests for different channels use different lock rows.
 
-```text
-10:00-11:00
-11:00-12:00
-```
+PostgreSQL is the final safety net if application validation is bypassed:
+
+| Constraint | Protection | API result |
+| ---------- | ---------- | ---------- |
+| `EpgProgram_time_range_check` | Rejects `startTime >= endTime`. | `400 INVALID_TIME_RANGE` |
+| `EpgProgram_no_overlap_excl` | Rejects overlapping time ranges on the same channel. | `400 EPG_OVERLAP` |
+
+The overlap constraint treats the end time as outside the program's range,
+which is why a program may begin exactly when the previous one ends. The
+`btree_gist` PostgreSQL extension allows the constraint to consider both the
+channel ID and time range.
 
 Indexes on `channelId`, `startTime`, and `endTime` make the overlap check fast for one channel.
-
-### `EpgScheduleLock`
-
-Stores one lock row per live channel.
-
-This table is used when creating EPG programs safely under concurrent requests.
-
-The write flow:
-
-1. Start a transaction.
-2. Update the channel's lock row.
-3. Check for overlapping programs.
-4. Insert the new program if no overlap exists.
-5. Commit the transaction.
-
-This makes overlapping requests for the same channel wait on the same lock row before they can write schedule data.
 
 ## Local Commands
 
@@ -285,10 +268,11 @@ Install dependencies:
 npm install
 ```
 
-Create the local database:
+Start PostgreSQL and apply migrations:
 
 ```bash
-npm run db:setup
+npm run db:start
+npm run db:migrate:prisma
 ```
 
 Load sample data:
@@ -303,11 +287,15 @@ Check the database connection:
 npm run db:check
 ```
 
-Reset the database:
+Fully reset the local PostgreSQL databases and reapply migrations:
 
 ```bash
-npm run db:reset
+npm run db:destroy
+npm run db:start
+npm run db:migrate:prisma
 ```
+
+This deletes local development and test data.
 
 Open Prisma Studio:
 

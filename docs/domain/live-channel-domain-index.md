@@ -14,6 +14,7 @@ src/live-channel/
   live-channel.test.ts
   epg-program/
     epg-program.ts
+    epg-program-error-mapper.ts
     epg-program-types.ts
     epg-program-repository.ts
     epg-program.test.ts
@@ -73,6 +74,12 @@ EPG programs are stored under `src/live-channel/epg-program/` because they are s
 | `createEpgProgramWithConcurrencyLock` | Runs EPG creation inside a transaction after touching the channel's `EpgScheduleLock` row, serializing same-channel writes so the second writer sees the first writer's program. |
 | `assertNoOverlappingEpgProgram` | Checks for a same-channel row matching `newStart < existingEnd AND newEnd > existingStart` before writes. |
 
+### `epg-program-error-mapper.ts`
+
+Converts the two named EPG database constraints into the existing
+`DomainError` codes `INVALID_TIME_RANGE` and `EPG_OVERLAP`. General Prisma
+constraint recognition remains in `src/db/database-error.ts`.
+
 The repository intentionally calls `prepareEpgProgramCreateInput(...)` even when the CMS service has already validated input. This protects the persistence boundary if another future use case calls the repository directly.
 
 ## CMS EPG Program Module
@@ -88,7 +95,7 @@ POST /api/v1/cms/channels/{channelId}/epg
 | `cms-epg-program.module.ts`         | Registers the CMS EPG routes on the Hono app. |
 | `cms-epg-program.route.ts`          | Maps `POST /:channelId/epg` to the controller. |
 | `cms-epg-program.controller.ts`     | Reads route params and JSON body, calls the service, and returns `201 Created`. |
-| `cms-epg-program.service.ts`        | Builds validated create input, checks channel existence, maps expected domain errors to HTTP errors, and calls the repository. |
+| `cms-epg-program.service.ts`        | Builds validated create input, checks channel existence, and calls the repository. |
 | `cms-epg-program.route.test.ts`     | Covers route-level success and error responses. |
 | `cms-epg-program.service.test.ts`   | Covers service-level required-field validation. |
 
@@ -178,15 +185,12 @@ transaction
   -> commit
 ```
 
-## Concurrency Strategy
+## Schedule Safety
 
-`createEpgProgramWithConcurrencyLock(...)` protects the overlap check and insert inside one database transaction. Before checking overlaps, it updates or creates the `EpgScheduleLock` row for the target channel. Same-channel writers contend on the same lock row, so they are serialized. Once the first transaction commits, the next transaction performs the overlap query against the updated schedule and rejects conflicting ranges.
-
-The lock is channel-scoped. Requests for different channels use different lock rows, so they can proceed independently from the application's perspective.
-
-SQLite note: SQLite is acceptable for this take-home assignment and local tests, but its write locking is database-level under concurrent writes. The per-channel lock proves the application-level invariant, but SQLite may still serialize broader write traffic internally. A shared production deployment should use PostgreSQL or another durable database.
-
-PostgreSQL note: the same application flow can use row locking on the channel lock row. A production hardening pass can also add PostgreSQL exclusion constraints over `(channel_id, tstzrange(start_time, end_time, '[)'))` to enforce non-overlap at the database layer.
+The application uses a transaction and one lock row per channel. PostgreSQL
+also enforces valid time ranges and non-overlapping schedules. The complete
+human-readable explanation lives in
+[Database Structure](../database-structure.md#epg-integrity-and-concurrency).
 
 ### `getLiveChannelById(prisma, channelId)`
 

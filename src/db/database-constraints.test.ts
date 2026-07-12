@@ -62,6 +62,36 @@ describe("database-level constraints", () => {
     ).rejects.toThrow();
   });
 
+  it("rejects a direct insert that bypasses service overlap validation", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-direct-overlap",
+      name: "Direct Overlap",
+      slug: "direct-overlap",
+    });
+    await prisma.epgProgram.create({
+      data: {
+        id: "epg-direct-existing",
+        channelId: "channel-direct-overlap",
+        programName: "Existing",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T20:00:00.000Z"),
+      },
+    });
+
+    await expect(
+      prisma.epgProgram.create({
+        data: {
+          id: "epg-direct-overlap",
+          channelId: "channel-direct-overlap",
+          programName: "Overlapping",
+          startTime: new Date("2026-07-02T19:00:00.000Z"),
+          endTime: new Date("2026-07-02T21:00:00.000Z"),
+        },
+      }),
+    ).rejects.toThrow();
+    await expect(prisma.epgProgram.count()).resolves.toBe(1);
+  });
+
   it("rejects unsupported content types at the database layer", async () => {
     await expect(
       prisma.content.create({
@@ -228,7 +258,8 @@ describe("database-level constraints", () => {
       WHERE conname IN (
         'Content_type_check',
         'Content_quality_check',
-        'EpgProgram_time_range_check'
+        'EpgProgram_time_range_check',
+        'EpgProgram_no_overlap_excl'
       )
       ORDER BY conname
     `;
@@ -250,6 +281,7 @@ describe("database-level constraints", () => {
     expect(constraints.map((constraint) => constraint.name)).toEqual([
       "Content_quality_check",
       "Content_type_check",
+      "EpgProgram_no_overlap_excl",
       "EpgProgram_time_range_check",
     ]);
     expect(timestampColumns).toEqual([
