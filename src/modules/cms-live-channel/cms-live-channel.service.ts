@@ -10,6 +10,7 @@ import {
 import type { LiveChannelPage } from "../../live-channel/live-channel-types.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { ApiError } from "../../shared/http/api-error.js";
+import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
 const CREATE_FIELDS = new Set(["name", "slug"]);
 const UPDATE_FIELDS = new Set(["name", "slug"]);
@@ -77,6 +78,7 @@ export class CmsLiveChannelService {
   async updateChannel(
     channelId: string | undefined,
     body: unknown,
+    ifMatch?: string,
   ): Promise<LiveChannel> {
     const id = readChannelId(channelId);
     const requestBody = readRequestBodyObject(body);
@@ -90,14 +92,19 @@ export class CmsLiveChannelService {
       );
     }
 
-    return updateLiveChannel(this.database, id, {
-      ...(Object.hasOwn(requestBody, "name")
-        ? { name: readRequiredString(requestBody.name, "name") }
-        : {}),
-      ...(Object.hasOwn(requestBody, "slug")
-        ? { slug: readRequiredString(requestBody.slug, "slug") }
-        : {}),
-    });
+    return updateLiveChannel(
+      this.database,
+      id,
+      {
+        ...(Object.hasOwn(requestBody, "name")
+          ? { name: readRequiredString(requestBody.name, "name") }
+          : {}),
+        ...(Object.hasOwn(requestBody, "slug")
+          ? { slug: readRequiredString(requestBody.slug, "slug") }
+          : {}),
+      },
+      readOptionalUpdatedAtEntityTag(ifMatch),
+    );
   }
 
   async deleteChannel(

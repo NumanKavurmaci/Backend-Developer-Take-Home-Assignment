@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { ApiError } from "../../shared/http/api-error.js";
 import { setCmsAuditResource } from "../../shared/http/cms-security.js";
+import { createUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 import { CmsEpgProgramService } from "./cms-epg-program.service.js";
 
 // Handles HTTP details: route params, JSON parsing, status codes, and responses.
@@ -16,6 +17,7 @@ export class CmsEpgProgramController {
     );
 
     setCmsAuditResource(c, program.id, channelId);
+    c.header("ETag", createUpdatedAtEntityTag(program.updatedAt));
     return c.json(program, 201);
   }
 
@@ -25,6 +27,7 @@ export class CmsEpgProgramController {
       c.req.param("programId"),
     );
 
+    c.header("ETag", createUpdatedAtEntityTag(program.updatedAt));
     return c.json(program);
   }
 
@@ -43,8 +46,10 @@ export class CmsEpgProgramController {
       c.req.param("channelId"),
       c.req.param("programId"),
       body,
+      c.req.header("If-Match"),
     );
 
+    c.header("ETag", createUpdatedAtEntityTag(program.updatedAt));
     return c.json(program);
   }
 

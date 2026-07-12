@@ -17,6 +17,7 @@ import type {
   UpdateEpgProgramInput,
 } from "../../live-channel/epg-program/epg-program-types.js";
 import { ApiError } from "../../shared/http/api-error.js";
+import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
 type RequestObject = Record<string, unknown>;
 
@@ -85,6 +86,7 @@ export class CmsEpgProgramService {
     channelId: string | undefined,
     programId: string | undefined,
     body: unknown,
+    ifMatch?: string,
   ): Promise<EpgProgramRecord> {
     const requestBody = readRequestObject(body, "Request body");
     assertAllowedFields(requestBody, UPDATE_FIELDS);
@@ -114,6 +116,7 @@ export class CmsEpgProgramService {
       ...(hasOwn(requestBody, "endTime")
         ? { endTime: readRequiredDate(requestBody.endTime, "endTime") }
         : {}),
+      expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
     };
 
     return updateEpgProgramWithConcurrencyLock(

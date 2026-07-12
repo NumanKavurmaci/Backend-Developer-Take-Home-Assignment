@@ -23,6 +23,10 @@ import {
 } from "../../content/content-metadata.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { ApiError } from "../../shared/http/api-error.js";
+import {
+  createUpdatedAtEntityTag,
+  readOptionalUpdatedAtEntityTag,
+} from "../../shared/http/entity-tag.js";
 
 const CREATE_FIELDS = new Set([
   "type",
@@ -121,7 +125,7 @@ export class CmsContentService {
 }
 
 export function createContentEtag(updatedAt: Date): string {
-  return `"${updatedAt.toISOString()}"`;
+  return createUpdatedAtEntityTag(updatedAt);
 }
 
 function buildCreateInput(body: unknown): CreateContentInput {
@@ -188,7 +192,7 @@ function buildUpdateInput(
       requestBody,
       "geoBlockCountries",
     ),
-    expectedUpdatedAt: readIfMatch(ifMatch),
+    expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
   };
 }
 
@@ -419,25 +423,6 @@ function readPositiveInteger(
   }
 
   return parsed;
-}
-
-function readIfMatch(value: string | undefined): Date | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  const match = /^"(.+)"$/.exec(value.trim());
-  const date = match ? new Date(match[1]!) : new Date(Number.NaN);
-
-  if (!match || Number.isNaN(date.getTime()) || date.toISOString() !== match[1]) {
-    throw new ApiError(
-      400,
-      "INVALID_IF_MATCH",
-      "If-Match must be an ETag returned by a content response",
-    );
-  }
-
-  return date;
 }
 
 function mapContentDomainError(error: DomainError): ApiError {

@@ -74,6 +74,9 @@ describe("CMS EPG program API routes", () => {
       updatedAt: "2026-07-02T17:00:00.000Z",
     });
     expect(response.status).toBe(201);
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-02T17:00:00.000Z"',
+    );
     expect(createProgram).toHaveBeenCalledWith("channel-saat-news", {
       programName: "Evening News",
       startTime: "2026-07-02T18:00:00Z",
@@ -97,6 +100,9 @@ describe("CMS EPG program API routes", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-02T17:00:00.000Z"',
+    );
     expect(getProgram).toHaveBeenCalledWith(
       "channel-saat-news",
       "epg-evening-news",
@@ -147,7 +153,10 @@ describe("CMS EPG program API routes", () => {
       "/api/v1/cms/channels/channel-saat-news/epg/epg-evening-news",
       {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": '"2026-07-02T17:00:00.000Z"',
+        },
         body: JSON.stringify({ programName: "Late News" }),
       },
     );
@@ -157,6 +166,10 @@ describe("CMS EPG program API routes", () => {
       "channel-saat-news",
       "epg-evening-news",
       { programName: "Late News" },
+      '"2026-07-02T17:00:00.000Z"',
+    );
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-02T17:30:00.000Z"',
     );
   });
 

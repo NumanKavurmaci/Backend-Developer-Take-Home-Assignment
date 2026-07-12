@@ -12,6 +12,8 @@ import type {
   LiveChannelWithScheduleLock,
   UpdateLiveChannelInput,
 } from "./live-channel-types.js";
+import { DomainError } from "../shared/domain/domain-error.js";
+import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
 
 type LiveChannelPrismaClient = PrismaClient | Prisma.TransactionClient;
 
@@ -101,18 +103,56 @@ export async function listLiveChannelsPage(
 }
 
 export async function updateLiveChannel(
-  prisma: LiveChannelPrismaClient,
+  prisma: PrismaClient,
   channelId: string,
   input: UpdateLiveChannelInput,
+  expectedUpdatedAt?: Date,
 ): Promise<LiveChannel> {
   const data = prepareLiveChannelUpdateInput(input);
 
   try {
-    return await prisma.liveChannel.update({
-      where: { id: channelId },
-      data,
+    return await prisma.$transaction(async (transaction) => {
+      const current = await transaction.liveChannel.findUnique({
+        where: { id: channelId },
+      });
+
+      if (!current) {
+        throw new DomainError("CHANNEL_NOT_FOUND", "Channel not found");
+      }
+
+      const result = await transaction.liveChannel.updateMany({
+        where: {
+          id: channelId,
+          ...(expectedUpdatedAt ? { updatedAt: expectedUpdatedAt } : {}),
+        },
+        data: {
+          ...data,
+          updatedAt: nextEntityUpdatedAt(current.updatedAt),
+        },
+      });
+
+      if (result.count === 0) {
+        throw new DomainError(
+          "LIVE_CHANNEL_WRITE_CONFLICT",
+          "Live channel changed after it was read. Fetch the latest version and retry.",
+        );
+      }
+
+      const updated = await transaction.liveChannel.findUnique({
+        where: { id: channelId },
+      });
+
+      if (!updated) {
+        throw new DomainError("CHANNEL_NOT_FOUND", "Channel not found");
+      }
+
+      return updated;
     });
   } catch (error) {
+    if (error instanceof DomainError) {
+      throw error;
+    }
+
     throw toLiveChannelDomainError(error) ?? error;
   }
 }

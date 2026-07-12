@@ -4,6 +4,7 @@ import { createEpgProgram } from "../../live-channel/epg-program/epg-program-rep
 import { createLiveChannel } from "../../live-channel/live-channel-repository.js";
 import { clearLiveChannelTables } from "../../test/test-database.js";
 import { CmsLiveChannelService } from "./cms-live-channel.service.js";
+import { createUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
 const database = new PrismaClient();
 const service = new CmsLiveChannelService(database);
@@ -117,6 +118,33 @@ describe("CMS live channel service", () => {
     ).rejects.toMatchObject({ errorCode: "LIVE_CHANNEL_SLUG_CONFLICT" });
     await expect(database.liveChannel.count()).resolves.toBe(2);
     await expect(database.epgScheduleLock.count()).resolves.toBe(2);
+  });
+
+  it("rejects stale optimistic-concurrency ETags", async () => {
+    const channel = await service.createChannel({
+      name: "Original",
+      slug: "original",
+    });
+    const etag = createUpdatedAtEntityTag(channel.updatedAt);
+
+    await service.updateChannel(channel.id, { name: "First" }, etag);
+    await expect(
+      service.updateChannel(channel.id, { name: "Stale" }, etag),
+    ).rejects.toMatchObject({
+      errorCode: "LIVE_CHANNEL_WRITE_CONFLICT",
+    });
+    await expect(service.getChannel(channel.id)).resolves.toMatchObject({
+      name: "First",
+    });
+  });
+
+  it("rejects malformed concurrency ETags", async () => {
+    await expect(
+      service.updateChannel("missing", { name: "Missing" }, "invalid"),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      errorCode: "INVALID_IF_MATCH",
+    });
   });
 
   it("returns not found for unknown reads, updates, and confirmed deletes", async () => {

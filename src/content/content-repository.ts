@@ -7,6 +7,7 @@ import {
 import { validateContentParent } from "./content-hierarchy.js";
 import { DomainError } from "../shared/domain/domain-error.js";
 import { isPrismaErrorCode } from "../db/database-error.js";
+import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
 
 export type CreateContentInput = {
   id?: string;
@@ -312,7 +313,7 @@ export async function updateCmsContent(
           isPremium: input.isPremium,
           playbackUrl: input.playbackUrl,
           geoBlockCountriesOverride: input.geoBlockCountriesOverride,
-          updatedAt: nextUpdatedAt(current.updatedAt),
+          updatedAt: nextEntityUpdatedAt(current.updatedAt),
         },
       });
 
@@ -442,10 +443,6 @@ async function assertReparentingDoesNotCreateCycle(
       });
     ancestorId = ancestor?.parentId ?? null;
   }
-}
-
-function nextUpdatedAt(currentUpdatedAt: Date): Date {
-  return new Date(Math.max(Date.now(), currentUpdatedAt.getTime() + 1));
 }
 
 function toCmsContentRecord(

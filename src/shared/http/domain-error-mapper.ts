@@ -16,7 +16,9 @@ const DOMAIN_ERROR_STATUS_BY_CODE: Record<string, ApiErrorStatusCode> = {
   INVALID_REQUEST_BODY: 400,
   INVALID_TIME_RANGE: 400,
   EPG_PROGRAM_NOT_FOUND: 404,
+  EPG_WRITE_CONFLICT: 409,
   LIVE_CHANNEL_SLUG_CONFLICT: 409,
+  LIVE_CHANNEL_WRITE_CONFLICT: 409,
 };
 
 export function toApiError(error: DomainError): ApiError {

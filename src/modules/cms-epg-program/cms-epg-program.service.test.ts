@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createLiveChannel } from "../../live-channel/live-channel-repository.js";
 import { clearLiveChannelTables } from "../../test/test-database.js";
 import { CmsEpgProgramService } from "./cms-epg-program.service.js";
+import { createUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
 const prisma = new PrismaClient();
 
@@ -208,6 +209,53 @@ describe("CMS EPG program service", () => {
         where: { channelId: "channel-service-news" },
       }),
     ).resolves.not.toBeNull();
+  });
+
+  it("rejects stale optimistic-concurrency ETags", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-versioned",
+      name: "Versioned",
+      slug: "versioned",
+    });
+    const service = new CmsEpgProgramService();
+    const program = await service.createProgram("channel-versioned", {
+      programName: "Original",
+      startTime: "2026-07-02T18:00:00Z",
+      endTime: "2026-07-02T19:00:00Z",
+    });
+    const etag = createUpdatedAtEntityTag(program.updatedAt);
+
+    await service.updateProgram(
+      "channel-versioned",
+      program.id,
+      { programName: "First" },
+      etag,
+    );
+    await expect(
+      service.updateProgram(
+        "channel-versioned",
+        program.id,
+        { programName: "Stale" },
+        etag,
+      ),
+    ).rejects.toMatchObject({ errorCode: "EPG_WRITE_CONFLICT" });
+    await expect(
+      service.getProgram("channel-versioned", program.id),
+    ).resolves.toMatchObject({ programName: "First" });
+  });
+
+  it("rejects malformed concurrency ETags", async () => {
+    await expect(
+      new CmsEpgProgramService().updateProgram(
+        "channel-versioned",
+        "program",
+        { programName: "Invalid" },
+        "invalid",
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      errorCode: "INVALID_IF_MATCH",
+    });
   });
 
   it("does not reveal a program through another channel route", async () => {

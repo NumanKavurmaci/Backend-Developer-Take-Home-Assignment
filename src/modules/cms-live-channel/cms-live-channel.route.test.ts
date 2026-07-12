@@ -62,6 +62,9 @@ describe("CMS live channel routes", () => {
     );
 
     expect(response.status).toBe(201);
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-12T10:00:00.000Z"',
+    );
     await expect(response.json()).resolves.toMatchObject({
       id: "channel-news",
       createdAt: "2026-07-12T10:00:00.000Z",
@@ -81,6 +84,9 @@ describe("CMS live channel routes", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-12T10:00:00.000Z"',
+    );
     expect(service.getChannel).toHaveBeenCalledWith("channel-news");
   });
 
@@ -120,14 +126,22 @@ describe("CMS live channel routes", () => {
       createService({ updateChannel }),
     ).request("/api/v1/cms/channels/channel-news", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": '"2026-07-12T10:00:00.000Z"',
+      },
       body: JSON.stringify({ name: "Saat World News" }),
     });
 
     expect(response.status).toBe(200);
-    expect(updateChannel).toHaveBeenCalledWith("channel-news", {
-      name: "Saat World News",
-    });
+    expect(updateChannel).toHaveBeenCalledWith(
+      "channel-news",
+      { name: "Saat World News" },
+      '"2026-07-12T10:00:00.000Z"',
+    );
+    expect(response.headers.get("ETag")).toBe(
+      '"2026-07-12T10:00:00.000Z"',
+    );
   });
 
   it("requires explicit confirmation before deleting", async () => {

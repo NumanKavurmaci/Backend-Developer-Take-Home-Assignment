@@ -17,6 +17,7 @@ export type UpdateEpgProgramInput = {
   programName?: string;
   startTime?: Date;
   endTime?: Date;
+  expectedUpdatedAt?: Date;
 };
 
 export type EpgProgramListOptions = {

@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { ApiError } from "../../shared/http/api-error.js";
 import { setCmsAuditResource } from "../../shared/http/cms-security.js";
+import { createUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 import { CmsLiveChannelService } from "./cms-live-channel.service.js";
 
 export class CmsLiveChannelController {
@@ -9,11 +10,14 @@ export class CmsLiveChannelController {
   async createChannel(c: Context) {
     const channel = await this.service.createChannel(await readJsonBody(c));
     setCmsAuditResource(c, channel.id);
+    c.header("ETag", createUpdatedAtEntityTag(channel.updatedAt));
     return c.json(channel, 201);
   }
 
   async getChannel(c: Context) {
-    return c.json(await this.service.getChannel(c.req.param("channelId")));
+    const channel = await this.service.getChannel(c.req.param("channelId"));
+    c.header("ETag", createUpdatedAtEntityTag(channel.updatedAt));
+    return c.json(channel);
   }
 
   async listChannels(c: Context) {
@@ -31,7 +35,9 @@ export class CmsLiveChannelController {
     const channel = await this.service.updateChannel(
       c.req.param("channelId"),
       await readJsonBody(c),
+      c.req.header("If-Match"),
     );
+    c.header("ETag", createUpdatedAtEntityTag(channel.updatedAt));
     return c.json(channel);
   }
 

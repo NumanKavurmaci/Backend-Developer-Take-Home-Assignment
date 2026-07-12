@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { DomainError } from "../../shared/domain/domain-error.js";
+import { nextEntityUpdatedAt } from "../../shared/http/entity-tag.js";
 import {
   normalizeEpgProgramChannelId,
   prepareEpgProgramCreateInput,
@@ -163,6 +164,17 @@ export async function updateEpgProgramWithConcurrencyLock(
         normalizedChannelId,
         programId,
       );
+
+      if (
+        input.expectedUpdatedAt &&
+        current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()
+      ) {
+        throw new DomainError(
+          "EPG_WRITE_CONFLICT",
+          "EPG program changed after it was read. Fetch the latest version and retry.",
+        );
+      }
+
       const data = prepareEpgProgramUpdateInput(current, input);
       const effectiveInput: CreateEpgProgramInput = {
         channelId: normalizedChannelId,
@@ -179,7 +191,10 @@ export async function updateEpgProgramWithConcurrencyLock(
 
       return transaction.epgProgram.update({
         where: { id: current.id },
-        data,
+        data: {
+          ...data,
+          updatedAt: nextEntityUpdatedAt(current.updatedAt),
+        },
       });
     });
   } catch (error) {
