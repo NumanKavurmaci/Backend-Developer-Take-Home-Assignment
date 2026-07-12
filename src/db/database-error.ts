@@ -44,6 +44,7 @@ export function toDatabaseConstraintFailure(
     readString(errorRecord?.name),
     readString(errorRecord?.message),
     readString(errorRecord?.stack),
+    readString(meta?.database_error),
     stringifyMetadata(meta),
   ].join(" ");
 

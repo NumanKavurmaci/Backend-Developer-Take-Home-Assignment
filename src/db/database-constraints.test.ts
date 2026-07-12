@@ -45,6 +45,7 @@ describe("database-level constraints", () => {
         },
       }),
     );
+
     const failure = toDatabaseConstraintFailure(error);
 
     expect(failure).toBeDefined();
@@ -54,13 +55,9 @@ describe("database-level constraints", () => {
         failure?.sqlState === "23514",
     ).toBe(true);
 
-    if (failure?.constraintName === EPG_TIME_RANGE_CONSTRAINT) {
-      expect(toEpgProgramDomainError(error)).toMatchObject({
-        errorCode: "INVALID_TIME_RANGE",
-      });
-    } else {
-      expect(toEpgProgramDomainError(error)).toBeUndefined();
-    }
+    expect(toEpgProgramDomainError(error)).toMatchObject({
+      errorCode: "INVALID_TIME_RANGE",
+    });
   });
 
   it("rejects direct EPG inserts where startTime is after endTime", async () => {
