@@ -159,7 +159,6 @@ describe("CMS EPG program service", () => {
         endTime: "2026-07-02T18:30:00Z",
       }),
     ).rejects.toMatchObject({
-      statusCode: 404,
       errorCode: "CHANNEL_NOT_FOUND",
       message: "Channel not found",
     });

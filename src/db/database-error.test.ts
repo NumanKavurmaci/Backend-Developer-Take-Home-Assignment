@@ -33,7 +33,9 @@ describe("database error recognition", () => {
 
     expect(failure).toEqual({
       constraintName: "EpgProgram_no_overlap_excl",
+      modelName: undefined,
       sqlState: undefined,
+      targetFields: undefined,
       type: undefined,
     });
   });
@@ -73,7 +75,9 @@ describe("database error recognition", () => {
   it("does not invent details for an unknown P2004 error", () => {
     expect(toDatabaseConstraintFailure({ code: "P2004" })).toEqual({
       constraintName: undefined,
+      modelName: undefined,
       sqlState: undefined,
+      targetFields: undefined,
       type: undefined,
     });
   });
@@ -92,8 +96,35 @@ describe("database error recognition", () => {
       toDatabaseConstraintFailure({ code: "P2004", meta: "invalid" }),
     ).toEqual({
       constraintName: undefined,
+      modelName: undefined,
       sqlState: undefined,
+      targetFields: undefined,
       type: undefined,
+    });
+  });
+
+  it("retains Prisma model and normalized target fields", () => {
+    expect(
+      toDatabaseConstraintFailure({
+        code: "P2002",
+        meta: {
+          modelName: "EpgProgram",
+          target: ["channelId", "startTime", "endTime"],
+        },
+      }),
+    ).toMatchObject({
+      modelName: "EpgProgram",
+      targetFields: ["channelId", "startTime", "endTime"],
+    });
+
+    expect(
+      toDatabaseConstraintFailure({
+        code: "P2003",
+        meta: { field_name: "EpgScheduleLock_channelId_fkey (index)" },
+      }),
+    ).toMatchObject({
+      constraintName: "EpgScheduleLock_channelId_fkey",
+      targetFields: ["EpgScheduleLock_channelId_fkey"],
     });
   });
 

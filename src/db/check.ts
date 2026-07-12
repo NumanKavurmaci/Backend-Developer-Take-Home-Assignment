@@ -1,7 +1,9 @@
 import { prisma } from "./client.js";
+import { assertDatabaseReady } from "./readiness.js";
 
 async function main() {
   await prisma.$connect();
+  await assertDatabaseReady(prisma);
 
   const [[connection], contentCount, channelCount, epgProgramCount] =
     await Promise.all([

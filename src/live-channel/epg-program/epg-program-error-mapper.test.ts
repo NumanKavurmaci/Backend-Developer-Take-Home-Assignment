@@ -16,9 +16,7 @@ describe("EPG program error mapper", () => {
   });
 
   it("maps Prisma's normalized exclusion violation", () => {
-    const error = normalizedConstraintViolation(
-      "ExclusionConstraintViolation",
-    );
+    const error = normalizedConstraintViolation("ExclusionConstraintViolation");
 
     expect(toEpgProgramDomainError(error)).toMatchObject({
       errorCode: "EPG_OVERLAP",
@@ -47,13 +45,37 @@ describe("EPG program error mapper", () => {
   });
 
   it.each([
-    [{ code: "P2002" }, "EPG_OVERLAP"],
-    [{ message: "PostgreSQL error 23505" }, "EPG_OVERLAP"],
-    [{ code: "P2003" }, "CHANNEL_NOT_FOUND"],
-    [{ message: "PostgreSQL error 23503" }, "CHANNEL_NOT_FOUND"],
-  ])("maps EPG integrity error %# to %s", (error, errorCode) => {
+    [
+      {
+        code: "P2002",
+        meta: {
+          modelName: "EpgProgram",
+          target: ["channelId", "startTime", "endTime"],
+        },
+      },
+      "EPG_OVERLAP",
+    ],
+    [
+      {
+        code: "P2003",
+        meta: { field_name: "EpgScheduleLock_channelId_fkey (index)" },
+      },
+      "CHANNEL_NOT_FOUND",
+    ],
+  ])("maps identified EPG integrity error %# to %s", (error, errorCode) => {
     expect(toEpgProgramDomainError(error)).toMatchObject({ errorCode });
   });
+
+  it.each([
+    { code: "P2002" },
+    { message: "PostgreSQL error 23505" },
+    { code: "P2002", meta: { modelName: "EpgProgram", target: ["id"] } },
+  ])(
+    "does not classify an unidentified unique failure as overlap: %#",
+    (error) => {
+      expect(toEpgProgramDomainError(error)).toBeUndefined();
+    },
+  );
 
   it("leaves not-null violations as internal failures", () => {
     expect(toEpgProgramDomainError({ code: "P2011" })).toBeUndefined();

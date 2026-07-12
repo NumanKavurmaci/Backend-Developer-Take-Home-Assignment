@@ -44,6 +44,14 @@ describe("test database safety guard", () => {
     ).not.toThrow();
   });
 
+  it("accepts a generated isolated test database", () => {
+    expect(() =>
+      assertUsingTestDatabase(
+        "postgresql://saatcms:saatcms_local@localhost:5432/saatcms_test_42_deadbeef?schema=public",
+      ),
+    ).not.toThrow();
+  });
+
   it("rejects the development database before destructive cleanup", () => {
     expect(() =>
       assertUsingTestDatabase(
@@ -84,9 +92,9 @@ describe("test database safety guard", () => {
       Array<{ migration_name: string }>
     >`SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL ORDER BY migration_name`;
 
-    expect(appliedMigrations.map(({ migration_name }) => migration_name)).toEqual(
-      committedMigrations,
-    );
+    expect(
+      appliedMigrations.map(({ migration_name }) => migration_name),
+    ).toEqual(committedMigrations);
   });
 
   it("rejects cleanup when a Prisma client reaches a different schema", async () => {

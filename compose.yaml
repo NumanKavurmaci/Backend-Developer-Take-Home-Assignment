@@ -1,15 +1,12 @@
-name: saatcms
-
 services:
   postgres:
     image: postgres:18
-    container_name: saatcms-postgres
     environment:
       POSTGRES_DB: saatcms
       POSTGRES_USER: saatcms
       POSTGRES_PASSWORD: saatcms_local
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U saatcms -d saatcms"]
       interval: 5s
@@ -23,5 +20,3 @@ services:
 
 volumes:
   postgres_data:
-    name: saatcms-postgres-data
-

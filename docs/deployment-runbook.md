@@ -15,9 +15,9 @@ in the deployment ticket.
   committed to this repository.
 - Paid Render PostgreSQL has point-in-time recovery (PITR). Confirm the Recovery
   page shows an active recovery window before cutover.
-- The web service uses `/ready` as its deploy health check. This endpoint runs
-  `SELECT 1` through Prisma and returns `503 DATABASE_NOT_READY` if PostgreSQL
-  cannot be reached.
+- The web service uses `/ready` as its deploy health check. With a short query
+  timeout, it verifies required relations and completed migration history and
+  returns `503 DATABASE_NOT_READY` for connectivity or schema incompatibility.
 - Application startup uses `npm start`; it does not migrate, seed, reset, or
   open a local database file.
 
@@ -50,10 +50,12 @@ network rules.
    committed migration to the empty database.
 4. From a one-off staging shell, run `npm run db:check`. Record the database
    name, database user, and PostgreSQL version from its output.
-5. For demo staging only, run `npm run db:seed`, followed by
+5. For demo staging only, run
+   `DEMO_DATABASE_CONFIRMATION="actual-db-host/saatcms/public" npm run db:seed`
+   (using the host from `DATABASE_URL`), followed by
    `npm run db:seed:verify`. Expected counts are six content records, two live
    channels, and three EPG programs.
-6. From a clean checkout, run the deployed smoke and concurrency suite:
+6. From a clean checkout, run the read-only deployed smoke suite:
 
    ```bash
    npm ci
@@ -65,9 +67,9 @@ network rules.
    This proves data is held by managed PostgreSQL rather than application disk.
 
 The smoke suite checks `/health`, `/ready`, inherited metadata, allowed
-playback, geo blocking, device blocking, successful EPG creation, overlap
-rejection, and two concurrent independent EPG requests. Exactly one concurrent
-overlapping request must return `201`; the other must return `400`.
+playback, geo blocking, and device blocking. Every request has a ten-second
+timeout. EPG write/concurrency checks run in CI against disposable isolated test
+databases; deployed smoke checks remain read-only and leave no residual rows.
 
 ## Backup and Restore Rehearsal
 
@@ -132,5 +134,5 @@ project are intentionally not auto-reversed.
 | CI                  | Apply migrations to fresh PostgreSQL and block invalid migrations or failing tests.           |
 | Deployment          | Apply committed migrations with `prisma migrate deploy` before traffic moves.                 |
 | Demo initialization | An operator explicitly runs the guarded seed and verifies counts.                             |
-| Runtime             | Serve requests and report PostgreSQL connectivity through `/ready`.                           |
+| Runtime             | Serve requests and report PostgreSQL schema compatibility through `/ready`.                  |
 | Recovery            | An operator restores into an isolated database and switches the secret only after validation. |

@@ -16,7 +16,8 @@ describe("Hono app scaffold", () => {
 
     await expect(response.json()).resolves.toEqual({
       project: "SaatCMS Middleware Core",
-      message: "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
+      message:
+        "This project was built by Numan Kavurmacı from Samsun, Türkiye.",
       author: "Numan Kavurmacı",
       location: "Samsun, Türkiye",
       signedDate: "2026-07-03",
@@ -67,7 +68,7 @@ describe("Hono app scaffold", () => {
       status: "not_ready",
       service: "saatcms-middleware-core",
       errorCode: "DATABASE_NOT_READY",
-      message: "Database is not reachable.",
+      message: "Database is unreachable or its schema is not ready.",
     });
     expect(response.status).toBe(503);
     expect(logs).toHaveLength(1);

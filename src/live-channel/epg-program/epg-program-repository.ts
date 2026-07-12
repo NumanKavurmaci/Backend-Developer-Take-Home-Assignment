@@ -42,23 +42,27 @@ export async function createEpgProgramWithConcurrencyLock(
 ): Promise<EpgProgramRecord> {
   const data = prepareEpgProgramCreateInput(input);
 
-  return prisma.$transaction(async (transaction) => {
-    await transaction.epgScheduleLock.upsert({
-      where: {
-        channelId: data.channelId,
-      },
-      update: {
-        version: {
-          increment: 1,
+  try {
+    return await prisma.$transaction(async (transaction) => {
+      await transaction.epgScheduleLock.upsert({
+        where: {
+          channelId: data.channelId,
         },
-      },
-      create: {
-        channelId: data.channelId,
-      },
-    });
+        update: {
+          version: {
+            increment: 1,
+          },
+        },
+        create: {
+          channelId: data.channelId,
+        },
+      });
 
-    return createEpgProgram(transaction, data);
-  });
+      return createEpgProgram(transaction, data);
+    });
+  } catch (error) {
+    throw toEpgProgramDomainError(error) ?? error;
+  }
 }
 
 export async function assertNoOverlappingEpgProgram(

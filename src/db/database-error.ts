@@ -2,7 +2,9 @@ type UnknownRecord = Record<string, unknown>;
 
 export type DatabaseConstraintFailure = {
   constraintName?: string;
+  modelName?: string;
   sqlState?: string;
+  targetFields?: string[];
   type?: string;
 };
 
@@ -48,7 +50,10 @@ export function toDatabaseConstraintFailure(
     stringifyMetadata(meta),
   ].join(" ");
 
-  const constraintName = findConstraintName(details);
+  const constraintName =
+    findConstraintName(details) ?? readPrismaConstraintName(meta?.field_name);
+  const modelName = readOptionalString(meta?.modelName);
+  const targetFields = readTargetFields(meta);
   const sqlState =
     findSqlState(details) ?? findPrismaIntegritySqlState(errorRecord?.code);
   const type = findConstraintType(details);
@@ -64,7 +69,9 @@ export function toDatabaseConstraintFailure(
 
   return {
     constraintName,
+    modelName,
     sqlState,
+    targetFields,
     type,
   };
 }
@@ -115,6 +122,38 @@ function readRecord(value: unknown): UnknownRecord | undefined {
 
 function readString(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function readTargetFields(
+  meta: UnknownRecord | undefined,
+): string[] | undefined {
+  const value = meta?.target ?? meta?.field_name;
+  const fields = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+      ? [value]
+      : [];
+  const normalized = fields
+    .filter((field): field is string => typeof field === "string")
+    .map((field) => field.replace(/\s*\(index\)\s*$/i, "").trim())
+    .filter(Boolean);
+
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function readPrismaConstraintName(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\s*\(index\)\s*$/i, "").trim();
+  return /^[A-Za-z_][A-Za-z0-9_]*_(?:fkey|key|pkey)$/.test(normalized)
+    ? normalized
+    : undefined;
 }
 
 function stringifyMetadata(metadata: unknown): string {

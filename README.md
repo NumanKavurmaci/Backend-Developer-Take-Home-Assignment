@@ -52,6 +52,11 @@ The credentials in `compose.yaml`, `.env.example`, and `.env.test` are
 local/test-only values. Deployed environments must provide secrets through
 their hosting platform.
 
+Compose derives resource names from the checkout by default. Set
+`COMPOSE_PROJECT_NAME` to an explicit unique name and `POSTGRES_PORT` to an
+unused host port when running multiple checkouts at once; containers and
+volumes remain scoped to that project.
+
 Start PostgreSQL and wait for its health check:
 
 ```bash
@@ -96,10 +101,14 @@ Use `db:migrate` only during development. CI and production deployments use
 or running the seed script. Application startup never migrates, resets, or
 seeds the database automatically.
 
-`db:reset` is destructive and is restricted to local development or the
-disposable test database. It does not seed automatically. Sample data is
-created only through a separate `db:seed` operation, and the seed refuses to
-run when `DEPLOYMENT_ENV=production`.
+`db:reset` and `db:seed` share a fail-closed target guard. They require an
+explicit `DEPLOYMENT_ENV`, a strict database/schema allowlist, and a live
+database identity check before any deletion. Local/test operations only accept
+loopback `saatcms` or generated `saatcms_test_*` databases. Demo seeding also
+requires `NODE_ENV=production` and
+`DEMO_DATABASE_CONFIRMATION=<database-host>/saatcms/public`; production and staging targets are
+always rejected. Reset does not seed automatically, and the entire demo seed is
+committed atomically only after its expected counts are verified.
 
 ## Shared Demo Deployment
 
@@ -112,7 +121,7 @@ point-in-time recovery; confirm it is active before cutover.
 The deployment sequence is intentionally separate from application startup:
 
 1. Build the application and generate Prisma Client.
-2. Run `npm run db:migrate:deploy` as the pre-deploy command.
+2. Run `npm run db:migrate:deploy && npm run db:check` as the pre-deploy command.
 3. Start the application only after migrations succeed.
 4. Route traffic only after `GET /ready` can query PostgreSQL.
 
@@ -120,7 +129,7 @@ Migrations never seed data. For the demo environment, open a one-off service
 shell and explicitly run:
 
 ```bash
-npm run db:seed
+DEMO_DATABASE_CONFIRMATION="actual-db-host/saatcms/public" npm run db:seed
 npm run db:seed:verify
 ```
 
@@ -180,7 +189,9 @@ curl http://localhost:3000/ready
 }
 ```
 
-`GET /health` only confirms the process is alive. `GET /ready` also checks database connectivity.
+`GET /health` only confirms the process is alive. `GET /ready` applies a short
+query timeout and verifies required relations, the latest completed migration,
+and the absence of unfinished or rolled-back migration records.
 
 ## Request Correlation
 
@@ -230,7 +241,12 @@ npm test
 npm run test:coverage
 ```
 
-The tests use `.env.test` and rebuild the dedicated `saatcms_test` PostgreSQL database from committed migrations. Destructive cleanup requires `NODE_ENV=test`, refuses non-local hosts and any database not named `saatcms_test`, and verifies the live Prisma connection's database and schema before deleting data. Suite teardown clears application tables while preserving the committed migration history and disconnects its Prisma client.
+Each Vitest process derives a unique `saatcms_test_<run-id>_<uuid>` database
+from `.env.test`, creates it through a local maintenance connection, applies
+committed migrations, and drops it in teardown. Destructive cleanup requires
+`NODE_ENV=test`, a loopback host, the generated name prefix, and a matching live
+database/schema identity. Separate terminals and worktrees therefore cannot
+delete one another's fixtures.
 
 Coverage includes application source under `src` and excludes tests, test helpers, docs-only checks, generated/build output, and CLI entrypoints that start long-running processes. The global line coverage threshold is 90%.
 
@@ -250,8 +266,7 @@ routed traffic.
 
 ## CI Quality Gate
 
-GitHub Actions runs on every push and pull request. It starts PostgreSQL,
-generates Prisma Client, deploys committed migrations, proves the active
-PostgreSQL connection, runs database constraint and concurrency tests,
-typechecks, runs the complete test and coverage gates, and builds production
-output.
+GitHub Actions runs pull requests and pushes to `master`, cancelling superseded
+runs. The coverage command is the single complete suite execution. CI also
+checks concurrent test isolation and runs the exact Render build and pre-deploy
+commands under `NODE_ENV=production` in a separate clean job.

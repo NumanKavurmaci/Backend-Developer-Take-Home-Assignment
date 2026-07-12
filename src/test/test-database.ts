@@ -1,10 +1,12 @@
 import { execFile } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@prisma/client";
+import { isGeneratedTestDatabaseName } from "../db/destructive-operation-guard.js";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -28,26 +30,39 @@ export async function configureTestDatabaseUrl(): Promise<void> {
   }
 }
 
-export async function recreateTestDatabase(): Promise<void> {
-  const databaseUrl = await getTestDatabaseUrl();
-  assertUsingTestDatabase(databaseUrl);
-  await resetTestDatabase(databaseUrl);
-}
-
-export async function removeTestDatabase(): Promise<void> {
-  const databaseUrl = await getTestDatabaseUrl();
-  assertUsingTestDatabase(databaseUrl);
-
+export async function provisionIsolatedTestDatabase(): Promise<
+  () => Promise<void>
+> {
+  const baseDatabaseUrl = await getTestDatabaseUrl();
+  assertUsingTestDatabase(baseDatabaseUrl);
+  const databaseName =
+    `saatcms_test_${process.pid}_${randomUUID().replaceAll("-", "")}`.toLowerCase();
+  const databaseUrl = replaceDatabaseName(baseDatabaseUrl, databaseName);
+  const maintenanceUrl = replaceDatabaseName(baseDatabaseUrl, "postgres");
   const { PrismaClient } = await import("@prisma/client");
-  const prisma = new PrismaClient({
-    datasources: { db: { url: databaseUrl } },
+  const maintenance = new PrismaClient({
+    datasources: { db: { url: maintenanceUrl } },
   });
 
   try {
-    await clearTestTables(prisma, databaseUrl);
+    await maintenance.$executeRawUnsafe(`CREATE DATABASE "${databaseName}"`);
   } finally {
-    await prisma.$disconnect();
+    await maintenance.$disconnect();
   }
+
+  process.env.DATABASE_URL = databaseUrl;
+  process.env.DEPLOYMENT_ENV = "test";
+
+  try {
+    await migrateTestDatabase(databaseUrl);
+  } catch (error) {
+    await dropGeneratedTestDatabase(maintenanceUrl, databaseName);
+    throw error;
+  }
+
+  return async () => {
+    await dropGeneratedTestDatabase(maintenanceUrl, databaseName);
+  };
 }
 
 export function assertUsingTestDatabase(
@@ -72,12 +87,13 @@ export function assertUsingTestDatabase(
   const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(
     parsedUrl.hostname,
   );
-  const isTestDatabase = parsedUrl.pathname === "/saatcms_test";
+  const databaseName = decodeURIComponent(parsedUrl.pathname.slice(1));
+  const isTestDatabase = /^saatcms_test(?:_[a-z0-9_]+)?$/.test(databaseName);
   const isTestEnvironment = nodeEnvironment === "test";
 
   if (!isPostgreSql || !isLocalHost || !isTestDatabase || !isTestEnvironment) {
     throw new Error(
-      "Refusing to run destructive test cleanup outside the local saatcms_test PostgreSQL database in NODE_ENV=test.",
+      "Refusing to run destructive test cleanup outside a local saatcms_test* PostgreSQL database in NODE_ENV=test.",
     );
   }
 }
@@ -129,7 +145,8 @@ export async function assertConnectedToTestDatabase(
   >`SELECT current_database() AS "databaseName", current_schema() AS "schemaName"`;
 
   if (
-    connection?.databaseName !== "saatcms_test" ||
+    connection?.databaseName !==
+      decodeURIComponent(parsedUrl.pathname.slice(1)) ||
     connection.schemaName !== expectedSchema
   ) {
     throw new Error(
@@ -160,7 +177,7 @@ async function getTestDatabaseUrl(): Promise<string> {
   return process.env.DATABASE_URL ?? readTestDatabaseUrl();
 }
 
-async function resetTestDatabase(databaseUrl: string): Promise<void> {
+async function migrateTestDatabase(databaseUrl: string): Promise<void> {
   const prismaCliPath = path.join(
     rootDir,
     "node_modules",
@@ -169,15 +186,48 @@ async function resetTestDatabase(databaseUrl: string): Promise<void> {
     "index.js",
   );
 
-  await execFileAsync(
-    process.execPath,
-    [prismaCliPath, "migrate", "reset", "--force", "--skip-seed"],
-    {
-      cwd: rootDir,
-      env: {
-        ...process.env,
-        DATABASE_URL: databaseUrl,
-      },
+  await execFileAsync(process.execPath, [prismaCliPath, "migrate", "deploy"], {
+    cwd: rootDir,
+    env: {
+      ...process.env,
+      DATABASE_URL: databaseUrl,
     },
-  );
+  });
+}
+
+function replaceDatabaseName(
+  databaseUrl: string,
+  databaseName: string,
+): string {
+  const parsedUrl = new URL(databaseUrl);
+  parsedUrl.pathname = `/${databaseName}`;
+  parsedUrl.searchParams.set("schema", "public");
+  return parsedUrl.toString();
+}
+
+async function dropGeneratedTestDatabase(
+  maintenanceUrl: string,
+  databaseName: string,
+): Promise<void> {
+  if (!isGeneratedTestDatabaseName(databaseName)) {
+    throw new Error(
+      "Refusing to drop a database without the generated test prefix.",
+    );
+  }
+
+  const { PrismaClient } = await import("@prisma/client");
+  const maintenance = new PrismaClient({
+    datasources: { db: { url: maintenanceUrl } },
+  });
+
+  try {
+    await maintenance.$queryRawUnsafe(
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '${databaseName}' AND pid <> pg_backend_pid()`,
+    );
+    await maintenance.$executeRawUnsafe(
+      `DROP DATABASE IF EXISTS "${databaseName}"`,
+    );
+  } finally {
+    await maintenance.$disconnect();
+  }
 }

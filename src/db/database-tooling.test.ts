@@ -27,7 +27,7 @@ describe("PostgreSQL database tooling", () => {
       "db:generate": "prisma generate",
       "db:migrate": "prisma migrate dev",
       "db:migrate:deploy": "prisma migrate deploy",
-      "db:reset": "prisma migrate reset",
+      "db:reset": "tsx scripts/reset-database.ts",
       "db:seed": "tsx prisma/seed.ts --demo",
       "db:check": "tsx src/db/check.ts",
     });
@@ -52,7 +52,9 @@ describe("PostgreSQL database tooling", () => {
     const result = await runNpmCommand("db:check", process.env.DATABASE_URL);
 
     expect(result.stdout).toContain('"database": "connected"');
-    expect(result.stdout).toContain('"databaseName": "saatcms_test"');
+    expect(result.stdout).toContain(
+      `"databaseName": "${new URL(process.env.DATABASE_URL!).pathname.slice(1)}"`,
+    );
     expect(result.stdout).toContain('"version": "PostgreSQL');
   });
 
@@ -100,7 +102,9 @@ async function sourceFiles(relativeDirectories: string[]): Promise<string[]> {
       const entryPath = path.join(directory, entry.name);
 
       if (entry.isDirectory()) {
-        results.push(...(await sourceFiles([path.relative(rootDir, entryPath)])));
+        results.push(
+          ...(await sourceFiles([path.relative(rootDir, entryPath)])),
+        );
       } else if (entry.name.endsWith(".ts")) {
         results.push(entryPath);
       }

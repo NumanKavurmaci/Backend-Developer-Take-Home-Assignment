@@ -22,25 +22,26 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:migrate:prisma": "npm run db:migrate",
-    "db:reset": "prisma migrate reset",
+    "db:reset": "tsx scripts/reset-database.ts",
     "db:test": "vitest run src/test/test-database.test.ts src/db/database-constraints.test.ts src/content/content-hierarchy.test.ts src/live-channel/live-channel.test.ts",
     "db:studio": "prisma studio",
     "db:check": "tsx src/db/check.ts",
-    "deploy:smoke": "tsx scripts/deployment-smoke.ts"
+    "deploy:smoke": "tsx scripts/deployment-smoke.ts",
+    "test:isolation": "tsx scripts/test-concurrent-isolation.ts"
   },
   "engines": {
-    "node": ">=24"
+    "node": ">=24 <25"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
     "@prisma/client": "5.22.0",
-    "hono": "^4.12.27"
+    "hono": "^4.12.27",
+    "prisma": "5.22.0",
+    "tsx": "^4.22.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
     "@vitest/coverage-v8": "^4.1.9",
-    "prisma": "5.22.0",
-    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.9"
   }

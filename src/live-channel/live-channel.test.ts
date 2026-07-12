@@ -441,6 +441,43 @@ describe("live channel repository", () => {
     });
   });
 
+  it("maps a missing channel lock foreign key to CHANNEL_NOT_FOUND", async () => {
+    await expect(
+      createEpgProgramWithConcurrencyLock(prisma, {
+        id: "epg-missing-channel",
+        channelId: "channel-does-not-exist",
+        programName: "Missing Channel",
+        startTime: new Date("2026-07-02T18:00:00.000Z"),
+        endTime: new Date("2026-07-02T19:00:00.000Z"),
+      }),
+    ).rejects.toMatchObject({ errorCode: "CHANNEL_NOT_FOUND" });
+  });
+
+  it("does not report a primary-key collision as schedule overlap", async () => {
+    await createLiveChannel(prisma, {
+      id: "channel-id-collision",
+      name: "Collision Channel",
+      slug: "collision-channel",
+    });
+    await createEpgProgram(prisma, {
+      id: "epg-duplicate-id",
+      channelId: "channel-id-collision",
+      programName: "First",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    });
+
+    await expect(
+      createEpgProgram(prisma, {
+        id: "epg-duplicate-id",
+        channelId: "channel-id-collision",
+        programName: "Second",
+        startTime: new Date("2026-07-02T20:00:00.000Z"),
+        endTime: new Date("2026-07-02T21:00:00.000Z"),
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
+  });
+
   it("allows concurrent EPG creation for different channels", async () => {
     await createLiveChannel(prisma, {
       id: "channel-saat-news",
