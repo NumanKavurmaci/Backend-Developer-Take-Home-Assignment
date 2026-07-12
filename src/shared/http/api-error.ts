@@ -4,6 +4,7 @@ export type ApiErrorStatusCode =
   | 403
   | 404
   | 409
+  | 413
   | 422
   | 429
   | 500

@@ -101,6 +101,10 @@ export function setRequestErrorCode(c: Context, errorCode: string): void {
   ensureRequestContext(c).errorCode = errorCode;
 }
 
+export function getRequestErrorCode(c: Context): string | undefined {
+  return ensureRequestContext(c).errorCode;
+}
+
 function readRequestId(c: Context): string | undefined {
   const requestId = c.req.header("X-Request-Id")?.trim();
   return requestId || undefined;

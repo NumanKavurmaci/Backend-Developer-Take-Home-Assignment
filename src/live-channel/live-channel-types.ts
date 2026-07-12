@@ -9,6 +9,25 @@ export type CreateLiveChannelInput = {
   slug: string;
 };
 
+export type UpdateLiveChannelInput = {
+  name?: string;
+  slug?: string;
+};
+
+export type LiveChannelListOptions = {
+  name?: string;
+  slug?: string;
+  page: number;
+  pageSize: number;
+};
+
+export type LiveChannelPage = {
+  items: LiveChannel[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
 export type LiveChannelWithPrograms = LiveChannel & {
   epgPrograms: EpgProgramRecord[];
 };

@@ -6,6 +6,7 @@ import {
   normalizeEpgProgramChannelId,
   normalizeEpgProgramName,
   prepareEpgProgramCreateInput,
+  prepareEpgProgramUpdateInput,
 } from "./epg-program.js";
 
 describe("EPG program domain", () => {
@@ -110,5 +111,23 @@ describe("EPG program domain", () => {
       startTime,
       endTime,
     });
+  });
+
+  it("validates partial updates against the effective time range", () => {
+    const current = {
+      channelId: "channel-news",
+      programName: "News",
+      startTime: new Date("2026-07-02T18:00:00.000Z"),
+      endTime: new Date("2026-07-02T19:00:00.000Z"),
+    };
+
+    expect(
+      prepareEpgProgramUpdateInput(current, { programName: " Updated News " }),
+    ).toEqual({ programName: "Updated News" });
+    expect(() =>
+      prepareEpgProgramUpdateInput(current, {
+        startTime: new Date("2026-07-02T20:00:00.000Z"),
+      }),
+    ).toThrow("EPG program startTime must be before endTime.");
   });
 });

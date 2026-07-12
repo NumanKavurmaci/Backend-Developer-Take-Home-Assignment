@@ -73,6 +73,10 @@ EPG programs are stored under `src/live-channel/epg-program/` because they are s
 | `createEpgProgram`  | Validates and normalizes create input, checks same-channel overlap, then inserts an `EpgProgram` row through Prisma. |
 | `createEpgProgramWithConcurrencyLock` | Runs EPG creation inside a transaction after touching the channel's `EpgScheduleLock` row, serializing same-channel writes so the second writer sees the first writer's program. |
 | `assertNoOverlappingEpgProgram` | Checks for a same-channel row matching `newStart < existingEnd AND newEnd > existingStart` before writes. |
+| `getEpgProgram` | Loads a program only through its owning channel. |
+| `listEpgPrograms` | Lists programs intersecting a required UTC window with bounded pagination. |
+| `updateEpgProgramWithConcurrencyLock` | Serializes, validates, overlap-checks, and updates a program. |
+| `deleteEpgProgram` | Deletes a channel-owned program while preserving the schedule lock. |
 
 ### `epg-program-error-mapper.ts`
 
@@ -84,20 +88,24 @@ The repository intentionally calls `prepareEpgProgramCreateInput(...)` even when
 
 ## CMS EPG Program Module
 
-The HTTP endpoint for creating EPG programs lives under `src/modules/cms-epg-program/`.
+The authenticated CRUD endpoints live under `src/modules/cms-epg-program/`.
 
 ```http
 POST /api/v1/cms/channels/{channelId}/epg
+GET /api/v1/cms/channels/{channelId}/epg
+GET /api/v1/cms/channels/{channelId}/epg/{programId}
+PATCH /api/v1/cms/channels/{channelId}/epg/{programId}
+DELETE /api/v1/cms/channels/{channelId}/epg/{programId}
 ```
 
 | File                                | Responsibility |
 | ----------------------------------- | -------------- |
 | `cms-epg-program.module.ts`         | Registers the CMS EPG routes on the Hono app. |
-| `cms-epg-program.route.ts`          | Maps `POST /:channelId/epg` to the controller. |
-| `cms-epg-program.controller.ts`     | Reads route params and JSON body, calls the service, and returns `201 Created`. |
-| `cms-epg-program.service.ts`        | Builds validated create input, checks channel existence, and calls the repository. |
-| `cms-epg-program.route.test.ts`     | Covers route-level success and error responses. |
-| `cms-epg-program.service.test.ts`   | Covers service-level required-field validation. |
+| `cms-epg-program.route.ts`          | Maps create, read, list, patch, and delete routes. |
+| `cms-epg-program.controller.ts`     | Handles HTTP inputs, ETags, status codes, and responses. |
+| `cms-epg-program.service.ts`        | Validates strict CRUD contracts and calls the repository. |
+| `cms-epg-program.route.test.ts`     | Covers route-level CRUD success and failures. |
+| `cms-epg-program.service.test.ts`   | Covers validation, ownership, pagination, and CRUD behavior. |
 
 Request flow:
 
@@ -109,7 +117,7 @@ HTTP request
   -> EPG domain validation
   -> channel-scoped overlap validation
   -> EPG repository
-  -> Prisma EpgProgram insert
+  -> Prisma EpgProgram read/write
 ```
 
 Current implementation status:
@@ -123,6 +131,9 @@ Current implementation status:
 | Invalid time ranges return `400` | implemented |
 | Overlap validation | implemented |
 | Concurrency-safe creation | implemented with a transactional per-channel schedule-lock row |
+| Read/list/update/delete | implemented with channel ownership enforcement |
+| Stale edit protection | implemented with optional ETag/If-Match |
+| Concurrent create/update safety | implemented with the schedule lock and PostgreSQL constraint |
 
 ## `live-channel.ts`
 

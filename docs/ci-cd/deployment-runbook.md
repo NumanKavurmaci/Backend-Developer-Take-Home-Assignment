@@ -20,6 +20,10 @@ in the deployment ticket.
   returns `503 DATABASE_NOT_READY` for connectivity or schema incompatibility.
 - Application startup uses `npm start`; it does not migrate, seed, reset, or
   open a local database file.
+- `CMS_API_KEYS` is a secret-store value and is never committed for shared
+  environments. CMS access fails closed when it is absent.
+- `CMS_MUTATIONS_ENABLED` is the operational write kill switch. Setting it to
+  `false` preserves CMS reads and middleware traffic.
 
 ## Provision the Shared Demo
 
@@ -30,10 +34,12 @@ in the deployment ticket.
 3. Confirm the web service's `DATABASE_URL` is sourced from
    `saatcms-postgres-demo`; do not paste a URL into source control.
 4. Confirm `NODE_ENV=production` and `DEPLOYMENT_ENV=demo`.
-5. Confirm the database Recovery page shows PITR before sending traffic.
-6. Deploy. The pre-deploy log must show `prisma migrate deploy`. Do not proceed
+5. Generate high-entropy CMS credentials, store `CMS_API_KEYS` as a platform
+   secret, and confirm `CMS_MUTATIONS_ENABLED=true` for the planned release.
+6. Confirm the database Recovery page shows PITR before sending traffic.
+7. Deploy. The pre-deploy log must show `prisma migrate deploy`. Do not proceed
    if any migration fails.
-7. Confirm the service becomes healthy through `/ready`.
+8. Confirm the service becomes healthy through `/ready`.
 
 Creating the Blueprint requires Render workspace access and may create paid
 resources. Repository changes alone do not prove that provisioning occurred.
@@ -116,7 +122,10 @@ Complete this before cutover.
 
 Application and database rollback are separate decisions.
 
-1. Stop or block new writes if database integrity is in doubt.
+1. Set `CMS_MUTATIONS_ENABLED=false` and redeploy/restart configuration to stop
+   CMS writes while preserving read and playback traffic. Verify an
+   authenticated CMS read succeeds and an authenticated CMS mutation returns
+   `503 CMS_MUTATIONS_DISABLED`.
 2. If the schema remains compatible, redeploy the previous application commit
    and repeat `/health`, `/ready`, metadata, and playback checks.
 3. Never run `prisma migrate reset`, delete migration rows, reverse SQL by hand,

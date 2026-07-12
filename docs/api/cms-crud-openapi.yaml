@@ -1,0 +1,619 @@
+openapi: 3.0.3
+info:
+  title: SaatCMS CRUD API
+  version: 1.0.0
+  description: Authenticated domain CRUD for Content, Live Channels, and EPG Programs.
+servers:
+  - url: http://localhost:3000
+security:
+  - bearerAuth: []
+tags:
+  - name: Content
+  - name: Live Channels
+  - name: EPG Programs
+paths:
+  /api/v1/cms/content:
+    post:
+      tags: [Content]
+      summary: Create Content
+      operationId: createContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContent"
+      responses:
+        "201":
+          $ref: "#/components/responses/ContentResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      tags: [Content]
+      summary: List Content
+      operationId: listContent
+      parameters:
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/ContentType"
+        - name: parentId
+          in: query
+          schema:
+            type: string
+        - name: title
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Content page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/Content"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/cms/content/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ContentId"
+    get:
+      tags: [Content]
+      summary: Get Content
+      operationId: getContent
+      responses:
+        "200":
+          $ref: "#/components/responses/ContentResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    patch:
+      tags: [Content]
+      summary: Patch Content
+      operationId: updateContent
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateContent"
+      responses:
+        "200":
+          $ref: "#/components/responses/ContentResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      tags: [Content]
+      summary: Delete leaf Content
+      operationId: deleteContent
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/cms/channels:
+    post:
+      tags: [Live Channels]
+      summary: Create Live Channel
+      operationId: createLiveChannel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLiveChannel"
+      responses:
+        "201":
+          $ref: "#/components/responses/LiveChannelResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      tags: [Live Channels]
+      summary: List Live Channels
+      operationId: listLiveChannels
+      parameters:
+        - name: name
+          in: query
+          schema:
+            type: string
+        - name: slug
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: Live Channel page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/LiveChannel"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/cms/channels/{channelId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    get:
+      tags: [Live Channels]
+      summary: Get Live Channel
+      operationId: getLiveChannel
+      responses:
+        "200":
+          $ref: "#/components/responses/LiveChannelResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    patch:
+      tags: [Live Channels]
+      summary: Patch Live Channel
+      operationId: updateLiveChannel
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLiveChannel"
+      responses:
+        "200":
+          $ref: "#/components/responses/LiveChannelResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      tags: [Live Channels]
+      summary: Delete Live Channel and cascade its schedule
+      operationId: deleteLiveChannel
+      parameters:
+        - name: confirm
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: ["true"]
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/cms/channels/{channelId}/epg:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+    post:
+      tags: [EPG Programs]
+      summary: Create EPG Program
+      operationId: createEpgProgram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEpgProgram"
+      responses:
+        "201":
+          $ref: "#/components/responses/EpgProgramResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    get:
+      tags: [EPG Programs]
+      summary: List EPG Programs intersecting a UTC window
+      operationId: listEpgPrograms
+      parameters:
+        - name: windowStart
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - name: windowEnd
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: EPG Program page
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Page"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/EpgProgram"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/cms/channels/{channelId}/epg/{programId}:
+    parameters:
+      - $ref: "#/components/parameters/ChannelId"
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      tags: [EPG Programs]
+      summary: Get EPG Program
+      operationId: getEpgProgram
+      responses:
+        "200":
+          $ref: "#/components/responses/EpgProgramResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    patch:
+      tags: [EPG Programs]
+      summary: Patch EPG Program
+      operationId: updateEpgProgram
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEpgProgram"
+      responses:
+        "200":
+          $ref: "#/components/responses/EpgProgramResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+    delete:
+      tags: [EPG Programs]
+      summary: Delete EPG Program
+      operationId: deleteEpgProgram
+      responses:
+        "204":
+          description: Deleted
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ContentId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    ChannelId:
+      name: channelId
+      in: path
+      required: true
+      schema:
+        type: string
+    ProgramId:
+      name: programId
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Strong ETag from the latest single-resource response.
+      schema:
+        type: string
+  responses:
+    ContentResponse:
+      description: Content resource
+      headers:
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Content"
+    LiveChannelResponse:
+      description: Live Channel resource
+      headers:
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/LiveChannel"
+    EpgProgramResponse:
+      description: EPG Program resource
+      headers:
+        ETag:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/EpgProgram"
+    ErrorResponse:
+      description: Expected API failure
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    ContentType:
+      type: string
+      enum: [SERIES, SEASON, EPISODE, MOVIE]
+    VideoQuality:
+      type: string
+      enum: [SD, HD, UHD_4K]
+      nullable: true
+    CreateContent:
+      type: object
+      additionalProperties: false
+      required: [type, title]
+      properties:
+        type:
+          $ref: "#/components/schemas/ContentType"
+        title:
+          type: string
+          minLength: 1
+        parentId:
+          type: string
+          nullable: true
+        parentalRating:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        quality:
+          $ref: "#/components/schemas/VideoQuality"
+        isPremium:
+          type: boolean
+          nullable: true
+        playbackUrl:
+          type: string
+          nullable: true
+        geoBlockCountriesOverride:
+          type: boolean
+          default: false
+        geoBlockCountries:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[A-Za-z]{2}$"
+    UpdateContent:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+        parentId:
+          type: string
+          nullable: true
+        parentalRating:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        quality:
+          $ref: "#/components/schemas/VideoQuality"
+        isPremium:
+          type: boolean
+          nullable: true
+        playbackUrl:
+          type: string
+          nullable: true
+        geoBlockCountriesOverride:
+          type: boolean
+        geoBlockCountries:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^[A-Za-z]{2}$"
+    Content:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - type
+        - title
+        - parentId
+        - parentalRating
+        - genre
+        - quality
+        - isPremium
+        - playbackUrl
+        - geoBlockCountriesOverride
+        - geoBlockCountries
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/ContentType"
+        title:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+        parentalRating:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        quality:
+          $ref: "#/components/schemas/VideoQuality"
+        isPremium:
+          type: boolean
+          nullable: true
+        playbackUrl:
+          type: string
+          nullable: true
+        geoBlockCountriesOverride:
+          type: boolean
+        geoBlockCountries:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateLiveChannel:
+      type: object
+      additionalProperties: false
+      required: [name, slug]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    UpdateLiveChannel:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    LiveChannel:
+      type: object
+      additionalProperties: false
+      required: [id, name, slug, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateEpgProgram:
+      type: object
+      additionalProperties: false
+      required: [programName, startTime, endTime]
+      properties:
+        programName:
+          type: string
+          minLength: 1
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    UpdateEpgProgram:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        programName:
+          type: string
+          minLength: 1
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    EpgProgram:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - channelId
+        - programName
+        - startTime
+        - endTime
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        channelId:
+          type: string
+        programName:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    Page:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+        message:
+          type: string

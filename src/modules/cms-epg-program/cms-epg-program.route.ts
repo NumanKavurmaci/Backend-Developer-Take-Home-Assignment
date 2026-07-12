@@ -8,6 +8,14 @@ export function createCmsEpgProgramRoutes(
   const routes = new Hono();
 
   routes.post("/:channelId/epg", (c) => controller.createProgram(c));
+  routes.get("/:channelId/epg", (c) => controller.listPrograms(c));
+  routes.get("/:channelId/epg/:programId", (c) => controller.getProgram(c));
+  routes.patch("/:channelId/epg/:programId", (c) =>
+    controller.updateProgram(c),
+  );
+  routes.delete("/:channelId/epg/:programId", (c) =>
+    controller.deleteProgram(c),
+  );
 
   return routes;
 }

@@ -14,6 +14,16 @@ services:
         value: production
       - key: DEPLOYMENT_ENV
         value: demo
+      - key: CMS_API_KEYS
+        sync: false
+      - key: CMS_AUTH_ATTEMPT_LIMIT_PER_MINUTE
+        value: "300"
+      - key: CMS_RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: CMS_MAX_BODY_BYTES
+        value: "1048576"
+      - key: CMS_MUTATIONS_ENABLED
+        value: "true"
       - key: DATABASE_URL
         fromDatabase:
           name: saatcms-postgres-demo

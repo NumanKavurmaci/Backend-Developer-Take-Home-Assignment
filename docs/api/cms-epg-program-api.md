@@ -1,12 +1,27 @@
 # CMS EPG Program API
 
-The CMS EPG endpoint lets operators create scheduled live programs for a channel.
+The authenticated CMS EPG API lets operators create, read, list, update, and
+delete scheduled live programs for a channel.
+
+| Method | Route |
+| --- | --- |
+| `POST` | `/api/v1/cms/channels/{channelId}/epg` |
+| `GET` | `/api/v1/cms/channels/{channelId}/epg?windowStart=...&windowEnd=...` |
+| `GET` | `/api/v1/cms/channels/{channelId}/epg/{programId}` |
+| `PATCH` | `/api/v1/cms/channels/{channelId}/epg/{programId}` |
+| `DELETE` | `/api/v1/cms/channels/{channelId}/epg/{programId}` |
+
+Every request requires a CMS bearer credential. Readers can get/list;
+editors and admins can create, patch, and delete:
 
 ```http
-POST /api/v1/cms/channels/{channelId}/epg
+Authorization: Bearer <CMS API key>
 ```
 
-This endpoint validates request shape, channel existence, date parsing, time range, channel-scoped overlap, and concurrency-safe scheduling before saving an EPG program.
+Create and update validate request shape, channel ownership, date parsing,
+time range, channel-scoped overlap, and concurrency-safe scheduling before a
+write commits. See the complete shared contract in
+[CMS CRUD API](cms-crud-api.md).
 
 ## Request
 
@@ -54,6 +69,36 @@ Date-time values without timezone information are rejected because their meaning
 }
 ```
 
+## Read, List, Update, and Delete
+
+List requires `windowStart` and `windowEnd` ISO 8601 query values with a
+timezone. It returns every program intersecting that half-open window and uses
+`page`/`pageSize` pagination with defaults `1`/`20` and maximum `100`.
+
+```bash
+curl -i "http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg?windowStart=2026-07-02T00%3A00%3A00Z&windowEnd=2026-07-03T00%3A00%3A00Z" \
+  -H "Authorization: Bearer $CMS_READER_KEY"
+```
+
+Get and PATCH routes are channel scoped: a program requested through a
+different channel returns `404 EPG_PROGRAM_NOT_FOUND`. PATCH accepts any
+non-empty subset of `programName`, `startTime`, and `endTime`; `channelId` is
+route-owned and cannot be changed.
+
+Single-resource responses include a strong `ETag`. Supplying it as `If-Match`
+on PATCH prevents a stale edit from overwriting a newer version:
+
+```bash
+curl -i -X PATCH http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg/PROGRAM_ID \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
+  -H 'If-Match: "2026-07-12T12:00:00.000Z"' \
+  -H "Content-Type: application/json" \
+  -d '{"programName":"Updated News"}'
+```
+
+A stale value returns `409 EPG_WRITE_CONFLICT`. DELETE returns `204` and
+removes only the requested program; it preserves the channel and schedule lock.
+
 ## Scheduling Rules
 
 Overlap validation uses this predicate:
@@ -75,13 +120,14 @@ The same time range is allowed on different channels because overlap validation 
 
 ## Concurrency Strategy
 
-EPG creation uses a transaction and the `EpgScheduleLock` row for the requested channel.
+EPG create, update, and delete use a transaction and the `EpgScheduleLock` row
+for the requested channel.
 
 ```text
 start transaction
   -> touch EpgScheduleLock for the requested channel
   -> check overlaps for that channel
-  -> insert EpgProgram if no overlap exists
+  -> create, update, or delete the EpgProgram
 commit transaction
 ```
 
@@ -95,6 +141,7 @@ Example request:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"programName":"Evening News","startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
 ```
@@ -136,6 +183,7 @@ Example request:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/v1/cms/channels/channel-saat-news/epg \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
 ```
@@ -196,6 +244,7 @@ Example request:
 
 ```bash
 curl -i -X POST http://localhost:3000/api/v1/cms/channels/missing-channel/epg \
+  -H "Authorization: Bearer $CMS_EDITOR_KEY" \
   -H "Content-Type: application/json" \
   -d '{"programName":"Evening News","startTime":"2026-07-02T18:00:00Z","endTime":"2026-07-02T19:00:00Z"}'
 ```
@@ -242,15 +291,14 @@ Request flow:
 
 ```text
 HTTP request
-  -> route matches POST /:channelId/epg
-  -> controller reads route param and JSON body
-  -> service validates request and checks channel existence
-  -> domain validates and normalizes create input
-  -> repository starts transaction
-  -> repository touches channel schedule-lock row
-  -> repository checks same-channel overlap
-  -> repository writes EpgProgram through Prisma
-  -> controller returns 201 with the created record
+  -> bearer authentication and role authorization
+  -> CRUD route and controller
+  -> strict request/query validation
+  -> channel-scoped repository read or transaction
+  -> write operations touch the channel schedule-lock row
+  -> create/update operations check same-channel overlap
+  -> Prisma read/write
+  -> controller returns the documented status and optional ETag
 ```
 
 Date-time validation happens before the channel lookup and before repository writes, so invalid request values fail without creating an EPG record.
