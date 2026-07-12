@@ -16,7 +16,7 @@ const season: TvMazeSeason = {
 };
 const episode: TvMazeEpisode = {
   id: 3, name: "Episode", url: null, season: 1, number: 1, airdate: "2024-01-02",
-  runtime: 30, rating: { average: 8 }, image: null, summary: null,
+  type: "regular", runtime: 30, rating: { average: 8 }, image: null, summary: null,
 };
 
 function artifact(): NormalizedCatalogArtifact {

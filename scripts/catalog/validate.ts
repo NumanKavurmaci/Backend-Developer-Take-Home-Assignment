@@ -5,16 +5,24 @@ import {
   tvmazeSeasonId,
   tvmazeSeriesId,
 } from "./identifiers.js";
-import type { DerivedSeasonIdentity, NormalizedCatalogArtifact, NormalizedContentRow } from "./types.js";
+import type { DerivedSeasonIdentity, NormalizedCatalogArtifact, NormalizedCatalogChunk, NormalizedContentRow } from "./types.js";
 
 const COUNTRY_CODE = /^[A-Z]{2}$/;
 
 export function validateNormalizedCatalog(artifact: NormalizedCatalogArtifact): void {
+  validateNormalizedCatalogChunk({
+    content: artifact.content,
+    geoBlocks: artifact.geoBlocks,
+    derivedSeasons: artifact.metadata.derivedSeasons,
+  });
+}
+
+export function validateNormalizedCatalogChunk(chunk: NormalizedCatalogChunk): void {
   const byId = new Map<string, NormalizedContentRow>();
   const sourceIdentities = new Set<string>();
   const logicalSeasons = new Set<string>();
 
-  for (const row of artifact.content) {
+  for (const row of chunk.content) {
     if (row.title.trim() === "") throw new Error(`Blank content title: ${row.id}.`);
     if (byId.has(row.id)) throw new Error(`Duplicate content ID: ${row.id}.`);
     byId.set(row.id, row);
@@ -27,7 +35,7 @@ export function validateNormalizedCatalog(artifact: NormalizedCatalogArtifact): 
     validateStableTvMazeIdentity(row);
   }
 
-  for (const row of artifact.content) {
+  for (const row of chunk.content) {
     validateParent(row, byId);
     if (row.type === "SEASON") {
       const key = `${row.parentId}/${row.sourceFacts.seasonNumber}`;
@@ -36,8 +44,8 @@ export function validateNormalizedCatalog(artifact: NormalizedCatalogArtifact): 
     }
   }
 
-  validateDerivedSeasons(artifact.metadata.derivedSeasons, artifact.content, byId);
-  for (const geoBlock of artifact.geoBlocks) {
+  validateDerivedSeasons(chunk.derivedSeasons, chunk.content, byId);
+  for (const geoBlock of chunk.geoBlocks) {
     if (!byId.has(geoBlock.contentId)) throw new Error(`Geo-block row has missing Content: ${geoBlock.contentId}.`);
     assertCountryCode(geoBlock.countryCode, `geo-block ${geoBlock.contentId}`);
   }

@@ -7,6 +7,7 @@ import {
   tvmazeSourceId,
 } from "./identifiers.js";
 import type { TvMazeEpisode, TvMazeSeason, TvMazeShow } from "./tvmaze-contracts.js";
+import { sanitizePlainText } from "./sanitize.js";
 import {
   EMPTY_SAATCMS_POLICIES,
   type CatalogSourceFacts,
@@ -20,29 +21,30 @@ export function isUsableTvMazeShow(record: Pick<TvMazeShow, "id" | "name">): boo
 }
 
 export function normalizeTvMazeShow(show: TvMazeShow, policies?: SaatCmsPolicies): NormalizedContentRow {
-  assertUsableRecord(show.id, show.name, "show");
+  const title = requiredPlainText(show.name, "show");
+  assertUsableRecord(show.id, title, "show");
   const network = show.network ?? show.webChannel;
   return {
     id: tvmazeSeriesId(show.id),
     type: "SERIES",
-    title: show.name.trim(),
+    title,
     parentId: null,
     sourceFacts: sourceFacts({
       sourceId: tvmazeSourceId("show", show.id),
       sourceUrl: show.url,
-      originalTitle: show.name,
-      summary: show.summary,
-      language: show.language,
-      status: show.status,
-      countryCode: network?.country?.code ?? null,
-      networkName: network?.name ?? null,
+      originalTitle: title,
+      summary: sanitizePlainText(show.summary),
+      language: sanitizePlainText(show.language),
+      status: sanitizePlainText(show.status),
+      countryCode: normalizeCountryCode(network?.country?.code ?? null),
+      networkName: sanitizePlainText(network?.name ?? null),
       officialSiteUrl: show.officialSite,
       imageUrl: imageUrl(show.image),
       premieredAt: show.premiered,
       endedAt: show.ended,
       runtimeMinutes: show.runtime,
       ratingAverage: show.rating.average,
-      genres: [...show.genres],
+      genres: normalizeGenres(show.genres),
     }),
     policies: { ...(policies ?? EMPTY_SAATCMS_POLICIES) },
   };
@@ -53,20 +55,21 @@ export function normalizeTvMazeSeason(
   season: TvMazeSeason,
   policies?: SaatCmsPolicies,
 ): NormalizedContentRow {
-  assertUsableRecord(season.id, season.name ?? `Season ${season.number}`, "season");
+  const title = sanitizePlainText(season.name) ?? `Season ${season.number}`;
+  assertUsableRecord(season.id, title, "season");
   const network = season.network ?? season.webChannel;
   return {
     id: tvmazeSeasonId(season.id),
     type: "SEASON",
-    title: season.name?.trim() || `Season ${season.number}`,
+    title,
     parentId: tvmazeSeriesId(showId),
     sourceFacts: sourceFacts({
       sourceId: tvmazeSourceId("season", season.id),
       sourceUrl: season.url,
-      originalTitle: season.name,
-      summary: season.summary,
-      countryCode: network?.country?.code ?? null,
-      networkName: network?.name ?? null,
+      originalTitle: sanitizePlainText(season.name),
+      summary: sanitizePlainText(season.summary),
+      countryCode: normalizeCountryCode(network?.country?.code ?? null),
+      networkName: sanitizePlainText(network?.name ?? null),
       imageUrl: imageUrl(season.image),
       premieredAt: season.premiereDate,
       endedAt: season.endDate,
@@ -110,23 +113,25 @@ export function normalizeTvMazeEpisode(
   policies?: SaatCmsPolicies,
 ): NormalizedContentRow {
   tvmazeSeriesId(showId);
-  assertUsableRecord(episode.id, episode.name, "episode");
+  const title = requiredPlainText(episode.name, "episode");
+  assertUsableRecord(episode.id, title, "episode");
   return {
     id: tvmazeEpisodeId(episode.id),
     type: "EPISODE",
-    title: episode.name.trim(),
+    title,
     parentId: seasonContentId,
     sourceFacts: sourceFacts({
       sourceId: tvmazeSourceId("episode", episode.id),
       sourceUrl: episode.url,
-      originalTitle: episode.name,
-      summary: episode.summary,
+      originalTitle: title,
+      summary: sanitizePlainText(episode.summary),
       imageUrl: imageUrl(episode.image),
       premieredAt: episode.airdate,
       runtimeMinutes: episode.runtime,
       seasonNumber: episode.season,
       episodeNumber: episode.number,
       ratingAverage: episode.rating.average,
+      sourceMetadata: episode.type === null ? null : { episodeType: episode.type },
     }),
     policies: { ...(policies ?? EMPTY_SAATCMS_POLICIES) },
   };
@@ -165,4 +170,19 @@ function imageUrl(image: { medium: string | null; original: string | null } | nu
 function assertUsableRecord(id: number, title: string, kind: string): void {
   if (!Number.isSafeInteger(id) || id <= 0) throw new Error(`Malformed TVmaze ${kind}: invalid ID.`);
   if (title.trim() === "") throw new Error(`Malformed TVmaze ${kind}: blank title.`);
+}
+
+function requiredPlainText(value: string, kind: string): string {
+  const text = sanitizePlainText(value);
+  if (text === null) throw new Error(`Malformed TVmaze ${kind}: blank title.`);
+  return text;
+}
+
+function normalizeCountryCode(value: string | null): string | null {
+  return value === null ? null : value.trim().toUpperCase();
+}
+
+function normalizeGenres(values: string[]): string[] {
+  return [...new Set(values.map((value) => sanitizePlainText(value)).filter((value): value is string => value !== null))]
+    .sort((left, right) => left.localeCompare(right));
 }

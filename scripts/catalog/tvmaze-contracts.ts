@@ -39,7 +39,8 @@ export interface TvMazeEpisode {
   id: number;
   name: string;
   url: string | null;
-  season: number;
+  type: string | null;
+  season: number | null;
   number: number | null;
   airdate: string | null;
   runtime: number | null;

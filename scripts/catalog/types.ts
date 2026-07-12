@@ -51,6 +51,17 @@ export interface NormalizedGeoBlockRow {
   countryCode: string;
 }
 
+export interface NormalizedCatalogChunk {
+  content: NormalizedContentRow[];
+  geoBlocks: NormalizedGeoBlockRow[];
+  derivedSeasons: DerivedSeasonIdentity[];
+}
+
+export interface ExcludedProviderRecord {
+  sourceId: string;
+  reason: "SPECIAL_OR_UNNUMBERED_EPISODE";
+}
+
 export interface CatalogSourceProvenance {
   source: CatalogSource;
   providerName: "TVmaze";

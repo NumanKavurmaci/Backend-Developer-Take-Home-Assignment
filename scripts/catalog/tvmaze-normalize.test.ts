@@ -22,7 +22,7 @@ const season: TvMazeSeason = {
 };
 const episode: TvMazeEpisode = {
   id: 99, name: "Pilot", url: "https://tvmaze.test/episodes/99", season: 1,
-  number: 1, airdate: "2020-01-02", runtime: 45, rating: { average: 8.2 },
+  type: "regular", number: 1, airdate: "2020-01-02", runtime: 45, rating: { average: 8.2 },
   image: null, summary: "Episode summary",
 };
 
