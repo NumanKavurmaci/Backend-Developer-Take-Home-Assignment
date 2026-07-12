@@ -11,7 +11,7 @@ The implementation will keep the same domain approach:
 - External source APIs are called only by an explicitly executed local generator.
 - A generated artifact is loaded from the developer machine into local or Render PostgreSQL by an explicit, guarded command.
 - Render build, migration, deploy, and application startup never call external catalog APIs and never automatically replace catalog data.
-- The deployed PostgreSQL database must remain below Render's 250 MB limit, with operational headroom rather than using the full allowance.
+- The deployed PostgreSQL database must remain below Render's 1 GB limit, with operational headroom rather than using the full allowance.
 
 ## Terminology and Data Ownership
 
@@ -63,13 +63,13 @@ Closed PR #3 is the implementation baseline for the catalog tooling. Its source 
 
 Define a measurable catalog boundary before changing the schema or importing data. The catalog generator must be configurable by content count and storage limits, but the final dataset size must be selected from actual PostgreSQL measurements rather than raw JSON size alone.
 
-The 250 MB Render allowance includes table rows, indexes, constraints, and PostgreSQL overhead. The initial target should keep the complete database at or below 190 MB after import, leaving at least 60 MB for operational headroom, migrations, EPG writes, and measurement variance.
+The 1 GB Render allowance includes table rows, indexes, constraints, and PostgreSQL overhead. The initial target should keep the complete database at or below 940 MB after import, leaving at least 60 MB for operational headroom, migrations, EPG writes, and measurement variance.
 
 ### Acceptance Criteria
 
 - TVmaze is selected as the initial real-life Series/Season/Episode provider.
 - The importer supports explicit maximums for shows, episodes per show, total content rows, normalized artifact bytes, and estimated database bytes.
-- The default hard database guard is no greater than 190 MB.
+- The default hard database guard is no greater than 940 MB.
 - The final row target is chosen only after a representative local PostgreSQL import is measured.
 - The plan reserves space for indexes, constraints, EPG data, migrations, and future writes.
 - The generator stops cleanly when a configured content or storage budget is reached.
@@ -681,24 +681,24 @@ Update all repository documentation and examples affected by the replacement of 
 
 Story points use the Fibonacci scale and represent relative implementation complexity, uncertainty, operational risk, and testing effort. They are not direct hour or day estimates.
 
-| Story | Summary | Points |
-| --- | --- | ---: |
-| RLD-01 | Scope and storage budget | 2 |
-| RLD-02 | Extend the Content database model | 5 |
-| RLD-03 | Import contracts and deterministic IDs | 5 |
-| RLD-04 | Cached local-only source client | 5 |
-| RLD-05 | TVmaze hierarchy normalization | 8 |
-| RLD-06 | Deterministic SaatCMS policies | 5 |
-| RLD-07 | Versioned content data artifact | 8 |
-| RLD-08 | Safe batched PostgreSQL loader | 13 |
-| RLD-09 | Replace fictional seed workflow | 5 |
-| RLD-10 | Repository and inheritance updates | 8 |
-| RLD-11 | Public content API metadata | 5 |
-| RLD-12 | Imported-data invariant verification | 8 |
-| RLD-13 | Application tests and fixtures | 8 |
-| RLD-14 | Local-to-Render import procedure | 5 |
-| RLD-15 | Documentation and attribution | 3 |
-| **Total** |  | **93** |
+| Story     | Summary                                | Points |
+| --------- | -------------------------------------- | -----: |
+| RLD-01    | Scope and storage budget               |      2 |
+| RLD-02    | Extend the Content database model      |      5 |
+| RLD-03    | Import contracts and deterministic IDs |      5 |
+| RLD-04    | Cached local-only source client        |      5 |
+| RLD-05    | TVmaze hierarchy normalization         |      8 |
+| RLD-06    | Deterministic SaatCMS policies         |      5 |
+| RLD-07    | Versioned content data artifact        |      8 |
+| RLD-08    | Safe batched PostgreSQL loader         |     13 |
+| RLD-09    | Replace fictional seed workflow        |      5 |
+| RLD-10    | Repository and inheritance updates     |      8 |
+| RLD-11    | Public content API metadata            |      5 |
+| RLD-12    | Imported-data invariant verification   |      8 |
+| RLD-13    | Application tests and fixtures         |      8 |
+| RLD-14    | Local-to-Render import procedure       |      5 |
+| RLD-15    | Documentation and attribution          |      3 |
+| **Total** |                                        | **93** |
 
 RLD-08 has the highest estimate because it combines destructive-operation safety, streaming and batching, hierarchy ordering, repeatability, failure recovery, Render target protection, and storage-limit enforcement. RLD-05, RLD-07, RLD-10, RLD-12, and RLD-13 carry additional uncertainty around provider data quality, artifact integrity, the raw recursive SQL mapping, production-size validation, and regression coverage.
 
@@ -792,7 +792,7 @@ The real-life data replacement is complete when:
 - A versioned, checksummed artifact can be validated independently of the database.
 - Local and Render loaders are explicit, guarded, repeatable, and do not affect Live Channel or EPG data.
 - Render build, migration, deployment, and application startup never fetch or automatically reload the catalog.
-- The deployed PostgreSQL database remains at or below the 190 MB project guard and therefore below Render's 250 MB platform limit with operational headroom.
+- The deployed PostgreSQL database remains at or below the 940 MB project guard and therefore below Render's 1 GB platform limit with operational headroom.
 - Manifest-backed useful IDs demonstrate every required assignment scenario.
 - Public metadata exposes useful real-life facts without exposing playback URLs or raw provider payloads.
 - Full typecheck, tests, 90 percent coverage gate, and production build pass without external network access.
