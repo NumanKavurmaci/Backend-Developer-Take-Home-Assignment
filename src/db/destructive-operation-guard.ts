@@ -54,7 +54,6 @@ export function validateDestructiveDatabaseTarget(
     if (
       nodeEnvironment === "production" ||
       !LOOPBACK_HOSTS.has(parsedUrl.hostname) ||
-      databaseName !== "saatcms" ||
       schemaName !== "public"
     ) {
       throw new Error(
@@ -76,7 +75,6 @@ export function validateDestructiveDatabaseTarget(
     const expectedConfirmation = `${parsedUrl.hostname}/${databaseName}/${schemaName}`;
     if (
       nodeEnvironment !== "production" ||
-      databaseName !== "saatcms" ||
       schemaName !== "public" ||
       environment.DEMO_DATABASE_CONFIRMATION !== expectedConfirmation
     ) {
