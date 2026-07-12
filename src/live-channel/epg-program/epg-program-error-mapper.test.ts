@@ -21,6 +21,26 @@ describe("EPG program error mapper", () => {
       toEpgProgramDomainError(new Error("connection failed")),
     ).toBeUndefined();
   });
+
+  it("maps Prisma's normalized exclusion violation for EpgProgram", () => {
+    const error = normalizedConstraintViolation(
+      "EpgProgram",
+      "ExclusionConstraintViolation",
+    );
+
+    expect(toEpgProgramDomainError(error)).toMatchObject({
+      errorCode: "EPG_OVERLAP",
+    });
+  });
+
+  it("does not map an exclusion violation belonging to another model", () => {
+    const error = normalizedConstraintViolation(
+      "Content",
+      "ExclusionConstraintViolation",
+    );
+
+    expect(toEpgProgramDomainError(error)).toBeUndefined();
+  });
 });
 
 function constraintViolation(constraintName: string) {
@@ -30,6 +50,20 @@ function constraintViolation(constraintName: string) {
       code: "P2004",
       clientVersion: "test",
       meta: { database_error: `violates constraint "${constraintName}"` },
+    },
+  );
+}
+
+function normalizedConstraintViolation(
+  modelName: string,
+  databaseError: string,
+) {
+  return new Prisma.PrismaClientKnownRequestError(
+    `A constraint failed on the database: ${databaseError}`,
+    {
+      code: "P2004",
+      clientVersion: "test",
+      meta: { modelName, database_error: databaseError },
     },
   );
 }

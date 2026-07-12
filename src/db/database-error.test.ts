@@ -1,6 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
-import { isDatabaseConstraintViolation } from "./database-error.js";
+import {
+  isDatabaseConstraintViolation,
+  isPrismaDatabaseError,
+} from "./database-error.js";
 
 describe("database error recognition", () => {
   it("recognizes a named Prisma database constraint violation", () => {
@@ -48,5 +51,30 @@ describe("database error recognition", () => {
     expect(
       isDatabaseConstraintViolation(error, "EpgProgram_no_overlap_excl"),
     ).toBe(true);
+  });
+
+  it("recognizes Prisma's normalized database error for one model", () => {
+    const error = new Prisma.PrismaClientKnownRequestError(
+      "A constraint failed on the database: ExclusionConstraintViolation",
+      {
+        code: "P2004",
+        clientVersion: "test",
+        meta: {
+          modelName: "EpgProgram",
+          database_error: "ExclusionConstraintViolation",
+        },
+      },
+    );
+
+    expect(
+      isPrismaDatabaseError(
+        error,
+        "ExclusionConstraintViolation",
+        "EpgProgram",
+      ),
+    ).toBe(true);
+    expect(
+      isPrismaDatabaseError(error, "ExclusionConstraintViolation", "Content"),
+    ).toBe(false);
   });
 });

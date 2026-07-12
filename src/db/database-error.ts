@@ -18,6 +18,20 @@ export function isDatabaseConstraintViolation(
   return details.includes(constraintName);
 }
 
+/** Matches the normalized database error type Prisma exposes for a model. */
+export function isPrismaDatabaseError(
+  error: unknown,
+  databaseErrorType: string,
+  modelName: string,
+): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2004" &&
+    error.meta?.database_error === databaseErrorType &&
+    error.meta?.modelName === modelName
+  );
+}
+
 function stringifyErrorMetadata(metadata: unknown): string {
   if (typeof metadata === "string") {
     return metadata;
