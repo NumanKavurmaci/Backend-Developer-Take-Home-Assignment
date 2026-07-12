@@ -27,6 +27,7 @@
     "db:studio": "prisma studio",
     "db:check": "tsx src/db/check.ts",
     "deploy:smoke": "tsx scripts/deployment-smoke.ts",
+    "deploy:setup": "npm run db:migrate:deploy && npm run db:check && npm run db:seed && npm run db:seed:verify && npm run deploy:smoke",
     "test:isolation": "tsx scripts/test-concurrent-isolation.ts"
   },
   "engines": {
