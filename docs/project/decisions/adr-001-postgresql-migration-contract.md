@@ -52,7 +52,7 @@ PG-03 will create a new PostgreSQL initial migration from the preserved logical 
 
 ## Data Preservation
 
-The repository's current SQLite records are demo data, not a production system of record. They will **not** be copied row by row. The PostgreSQL schema will be created from committed migrations, and demo content, channels, schedule-lock rows, and EPG programs will be recreated from [`prisma/seed.ts`](../../prisma/seed.ts).
+The repository's current SQLite records are demo data, not a production system of record. They will **not** be copied row by row. The PostgreSQL schema will be created from committed migrations, and demo content, channels, schedule-lock rows, and EPG programs will be recreated from [`prisma/seed.ts`](../../../prisma/seed.ts).
 
 Production data extraction, transformation, or bulk copy is out of scope. No unresolved data-preservation decision remains for the known repository data. If real persistent data is identified before cutover, the cutover must pause and a separate, reviewed data-migration plan must define reconciliation, validation, backup, and rollback before that data is changed.
 

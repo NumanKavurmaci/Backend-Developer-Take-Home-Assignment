@@ -11,12 +11,15 @@ const rootDir = path.resolve(
 );
 
 const requiredProjectFiles = [
-  "assignment.md",
-  "Saat_Teknoloji_CMS_MW_Assignment_Final.pdf",
-  "project-steps.md",
-  "SaatCMS_Technical_Improvement_Recommendations.md",
-  "post-release-fixes.md",
-];
+  ["assignment", "assignment.md"],
+  ["assignment", "Saat_Teknoloji_CMS_MW_Assignment_Final.pdf"],
+  ["decisions", "adr-001-postgresql-migration-contract.md"],
+  ["plans", "cms-crud-project-plan.md"],
+  ["plans", "post-release-fixes.md"],
+  ["plans", "postgresql-migration-project-plan.md"],
+  ["plans", "project-steps.md"],
+  ["reviews", "SaatCMS_Technical_Improvement_Recommendations.md"],
+] as const;
 
 describe("documentation consistency", () => {
   it("keeps every documentation artifact in a category folder", async () => {
@@ -35,13 +38,27 @@ describe("documentation consistency", () => {
     ).toEqual(["api", "ci-cd", "database", "domain", "project"]);
   });
 
-  it("keeps project documentation under docs/project only", async () => {
+  it("keeps project documentation organized under docs/project", async () => {
     expect(existsSync(path.join(rootDir, "project"))).toBe(false);
 
-    for (const file of requiredProjectFiles) {
-      expect(existsSync(path.join(rootDir, "docs", "project", file))).toBe(
-        true,
-      );
+    const projectEntries = await readdir(path.join(rootDir, "docs", "project"), {
+      withFileTypes: true,
+    });
+
+    expect(
+      projectEntries.filter((entry) => entry.isFile()).map((entry) => entry.name),
+    ).toEqual([]);
+    expect(
+      projectEntries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(["assignment", "decisions", "plans", "reviews"]);
+
+    for (const [category, file] of requiredProjectFiles) {
+      expect(
+        existsSync(path.join(rootDir, "docs", "project", category, file)),
+      ).toBe(true);
     }
   });
 

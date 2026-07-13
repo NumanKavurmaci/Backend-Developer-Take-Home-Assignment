@@ -76,7 +76,7 @@ pagination, error responses, and concurrency behavior.
 - [Database structure](docs/database/database-structure.md)
 - [Deployment and rollback runbook](docs/ci-cd/deployment-runbook.md)
 - [CI pipeline](docs/ci-cd/ci-pipeline.md)
-- [Original assignment](docs/project/assignment.md)
+- [Original assignment](docs/project/assignment/assignment.md)
 
 ## Verification
 

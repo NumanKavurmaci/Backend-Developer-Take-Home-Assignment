@@ -1,6 +1,6 @@
 # SaatCMS Post-Release Fixes Project Steps
 
-Source: [SaatCMS Technical Improvement Recommendations](SaatCMS_Technical_Improvement_Recommendations.md)
+Source: [SaatCMS Technical Improvement Recommendations](../reviews/SaatCMS_Technical_Improvement_Recommendations.md)
 
 These steps convert the technical review findings into an actionable post-release project plan. Each step includes the implementation goal, acceptance criteria, and the tests or automated checks that should be added before the step is considered complete.
 
@@ -168,12 +168,12 @@ Add a GitHub Actions workflow that proves each pushed commit and pull request ca
 
 ### Description
 
-Keep the repository documentation consistent with the implemented code and use `docs/project` as the only project-documentation folder. Historical or assignment assets should live under `docs/project`, not a second root-level `project` directory.
+Keep the repository documentation consistent with the implemented code and use categorized subfolders beneath `docs/project`. Historical or assignment assets should live there, not in a second root-level `project` directory.
 
 ### Acceptance Criteria
 
 - Root-level `project/` directory is removed.
-- Assignment PDF lives under `docs/project`.
+- Assignment PDF lives under `docs/project/assignment`.
 - README links to the assignment notes, assignment PDF, technical recommendations, original project steps, and post-release fixes.
 - Stale standalone TODO documentation is removed or archived.
 - Domain docs describe the current EPG concurrency implementation accurately.
@@ -182,7 +182,7 @@ Keep the repository documentation consistent with the implemented code and use `
 ### Tests and Checks to Implement
 
 - Documentation structure check: root-level `project/` directory does not exist.
-- Documentation structure check: required files exist under `docs/project`.
+- Documentation structure check: required files exist in the appropriate `docs/project` subfolders.
 - Markdown link check: README and docs links resolve.
 - Documentation smoke check: cURL examples still match the current API response shape.
 - Postman validation check: the collection contains the current success and failure examples.
