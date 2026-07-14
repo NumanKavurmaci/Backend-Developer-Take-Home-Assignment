@@ -154,6 +154,13 @@ describe("live channel repository", () => {
       name: "Saat News",
       slug: "saat-news",
     });
+    expect(Object.keys(channel).sort()).toEqual([
+      "createdAt",
+      "id",
+      "name",
+      "slug",
+      "updatedAt",
+    ]);
     expect(channelWithLock?.scheduleLock).toMatchObject({
       channelId: "channel-saat-news",
       version: 0,

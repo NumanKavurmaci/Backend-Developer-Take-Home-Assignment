@@ -29,9 +29,18 @@ describe("EPG program CRUD repository", () => {
     await createChannel("channel-sports");
     await createProgram("epg-news", "channel-news", 10, 11);
 
-    await expect(
-      getEpgProgram(prisma, "channel-news", "epg-news"),
-    ).resolves.toMatchObject({ id: "epg-news" });
+    const program = await getEpgProgram(prisma, "channel-news", "epg-news");
+
+    expect(program).toMatchObject({ id: "epg-news" });
+    expect(Object.keys(program).sort()).toEqual([
+      "channelId",
+      "createdAt",
+      "endTime",
+      "id",
+      "programName",
+      "startTime",
+      "updatedAt",
+    ]);
     await expect(
       getEpgProgram(prisma, "channel-sports", "epg-news"),
     ).rejects.toMatchObject({ errorCode: "EPG_PROGRAM_NOT_FOUND" });

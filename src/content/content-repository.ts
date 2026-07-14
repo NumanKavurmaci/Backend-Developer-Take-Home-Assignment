@@ -221,6 +221,7 @@ export async function updateCmsContent(
   prisma: PrismaClient,
   contentId: string,
   input: ContentUpdateInput,
+  expectedUpdatedAt?: Date,
 ): Promise<ContentRecord> {
   try {
     const content = await prisma.$transaction(async (transaction) => {
@@ -270,7 +271,7 @@ export async function updateCmsContent(
       const updateResult = await transaction.content.updateMany({
         where: {
           id: contentId,
-          updatedAt: input.expectedUpdatedAt,
+          updatedAt: expectedUpdatedAt,
         },
         data: {
           title: input.title,

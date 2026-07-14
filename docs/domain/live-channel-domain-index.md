@@ -59,14 +59,20 @@ contracts. Names consistently describe their role:
 | `LiveChannelCreateInput`       | Normalized channel create data. |
 | `LiveChannelUpdateInput`       | Mutable channel fields. |
 | `LiveChannelListQuery`         | Normalized channel filters and pagination. |
+| `LiveChannelRecord`            | Explicit channel response fields exposed by CMS services. |
 | `EpgProgramCreateInput`        | Program create data before Prisma adds database-managed fields. |
-| `EpgProgramUpdateInput`        | Mutable program fields and optional optimistic-concurrency timestamp. |
+| `EpgProgramUpdateInput`        | Mutable program fields. |
 | `EpgProgramListQuery`          | Channel, schedule window, and pagination filters. |
+| `EpgProgramRecord`             | Explicit program response fields exposed by CMS services. |
 | `PaginatedResult<Item>`        | Shared page response used by content, channels, and EPG programs. |
 
-Saved programs use Prisma's generated `EpgProgram` type directly; there is no
-pass-through record alias. Prisma relation payloads for programs and schedule
-locks remain local to `live-channel-repository.ts`.
+Repositories use explicit Prisma selects and field-by-field mappings for
+`LiveChannelRecord` and `EpgProgramRecord`, preventing future database columns
+from silently becoming API fields. Prisma relation payloads remain local to
+repository modules.
+
+Optimistic-concurrency timestamps are passed separately to all update
+repositories rather than being mixed into mutable domain update inputs.
 
 ### `epg-program.ts`
 

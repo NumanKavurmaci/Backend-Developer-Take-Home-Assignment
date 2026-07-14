@@ -1,4 +1,4 @@
-import type { EpgProgram, Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { nextEntityUpdatedAt } from "../../shared/http/entity-tag.js";
 import {
@@ -10,21 +10,36 @@ import { toEpgProgramDomainError } from "./epg-program-error-mapper.js";
 import type {
   EpgProgramCreateInput,
   EpgProgramListQuery,
+  EpgProgramRecord,
   EpgProgramUpdateInput,
   PaginatedResult,
 } from "../../shared/domain/domain-contracts.js";
 
 type EpgProgramPrismaClient = PrismaClient | Prisma.TransactionClient;
 
+const epgProgramSelect = {
+  id: true,
+  channelId: true,
+  programName: true,
+  startTime: true,
+  endTime: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.EpgProgramSelect;
+
+type EpgProgramRow = Prisma.EpgProgramGetPayload<{
+  select: typeof epgProgramSelect;
+}>;
+
 export async function createEpgProgram(
   prisma: EpgProgramPrismaClient,
   input: EpgProgramCreateInput,
-): Promise<EpgProgram> {
+): Promise<EpgProgramRecord> {
   const data = prepareEpgProgramCreateInput(input);
   await assertNoOverlappingEpgProgram(prisma, data);
 
   try {
-    return await prisma.epgProgram.create({
+    const program = await prisma.epgProgram.create({
       data: {
         id: data.id,
         channelId: data.channelId,
@@ -32,7 +47,10 @@ export async function createEpgProgram(
         startTime: data.startTime,
         endTime: data.endTime,
       },
+      select: epgProgramSelect,
     });
+
+    return toEpgProgramRecord(program);
   } catch (error) {
     throw toEpgProgramDomainError(error) ?? error;
   }
@@ -46,7 +64,7 @@ export async function createEpgProgram(
 export async function createEpgProgramWithConcurrencyLock(
   prisma: PrismaClient,
   input: EpgProgramCreateInput,
-): Promise<EpgProgram> {
+): Promise<EpgProgramRecord> {
   const data = prepareEpgProgramCreateInput(input);
 
   try {
@@ -99,25 +117,26 @@ export async function getEpgProgram(
   prisma: EpgProgramPrismaClient,
   channelId: string,
   programId: string,
-): Promise<EpgProgram> {
+): Promise<EpgProgramRecord> {
   const program = await prisma.epgProgram.findFirst({
     where: {
       id: programId,
       channelId: normalizeEpgProgramChannelId(channelId),
     },
+    select: epgProgramSelect,
   });
 
   if (!program) {
     throw epgProgramNotFound();
   }
 
-  return program;
+  return toEpgProgramRecord(program);
 }
 
 export async function listEpgPrograms(
   prisma: PrismaClient,
   options: EpgProgramListQuery,
-): Promise<PaginatedResult<EpgProgram>> {
+): Promise<PaginatedResult<EpgProgramRecord>> {
   const channelId = normalizeEpgProgramChannelId(options.channelId);
   await assertChannelExists(prisma, channelId);
 
@@ -128,18 +147,19 @@ export async function listEpgPrograms(
     endTime: { gt: options.windowStart },
   };
   const skip = (options.page - 1) * options.pageSize;
-  const [items, total] = await prisma.$transaction([
+  const [programs, total] = await prisma.$transaction([
     prisma.epgProgram.findMany({
       where,
       orderBy: [{ startTime: "asc" }, { id: "asc" }],
       skip,
       take: options.pageSize,
+      select: epgProgramSelect,
     }),
     prisma.epgProgram.count({ where }),
   ]);
 
   return {
-    items,
+    items: programs.map(toEpgProgramRecord),
     page: options.page,
     pageSize: options.pageSize,
     total,
@@ -151,7 +171,8 @@ export async function updateEpgProgramWithConcurrencyLock(
   channelId: string,
   programId: string,
   input: EpgProgramUpdateInput,
-): Promise<EpgProgram> {
+  expectedUpdatedAt?: Date,
+): Promise<EpgProgramRecord> {
   const normalizedChannelId = normalizeEpgProgramChannelId(channelId);
 
   try {
@@ -165,8 +186,8 @@ export async function updateEpgProgramWithConcurrencyLock(
       );
 
       if (
-        input.expectedUpdatedAt &&
-        current.updatedAt.getTime() !== input.expectedUpdatedAt.getTime()
+        expectedUpdatedAt &&
+        current.updatedAt.getTime() !== expectedUpdatedAt.getTime()
       ) {
         throw new DomainError(
           "EPG_WRITE_CONFLICT",
@@ -188,13 +209,16 @@ export async function updateEpgProgramWithConcurrencyLock(
         current.id,
       );
 
-      return transaction.epgProgram.update({
+      const updated = await transaction.epgProgram.update({
         where: { id: current.id },
         data: {
           ...data,
           updatedAt: nextEntityUpdatedAt(current.updatedAt),
         },
+        select: epgProgramSelect,
       });
+
+      return toEpgProgramRecord(updated);
     });
   } catch (error) {
     if (error instanceof DomainError) {
@@ -259,4 +283,16 @@ async function assertChannelExists(
 
 function epgProgramNotFound(): DomainError {
   return new DomainError("EPG_PROGRAM_NOT_FOUND", "EPG program not found");
+}
+
+function toEpgProgramRecord(program: EpgProgramRow): EpgProgramRecord {
+  return {
+    id: program.id,
+    channelId: program.channelId,
+    programName: program.programName,
+    startTime: program.startTime,
+    endTime: program.endTime,
+    createdAt: program.createdAt,
+    updatedAt: program.updatedAt,
+  };
 }

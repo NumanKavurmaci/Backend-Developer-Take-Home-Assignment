@@ -1,4 +1,3 @@
-import type { EpgProgram } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import {
   assertValidEpgProgramTimeRange,
@@ -13,6 +12,7 @@ import {
 } from "../../live-channel/epg-program/epg-program-repository.js";
 import type {
   EpgProgramCreateInput,
+  EpgProgramRecord,
   EpgProgramUpdateInput,
   PaginatedResult,
 } from "../../shared/domain/domain-contracts.js";
@@ -36,7 +36,7 @@ export class CmsEpgProgramService {
   async createProgram(
     channelId: string | undefined,
     body: unknown,
-  ): Promise<EpgProgram> {
+  ): Promise<EpgProgramRecord> {
     const createInput = buildCreateInput(channelId, body);
 
     return createEpgProgramWithConcurrencyLock(prisma, createInput);
@@ -45,7 +45,7 @@ export class CmsEpgProgramService {
   async getProgram(
     channelId: string | undefined,
     programId: string | undefined,
-  ): Promise<EpgProgram> {
+  ): Promise<EpgProgramRecord> {
     return getEpgProgram(
       prisma,
       readRequiredRouteId(channelId, "channelId"),
@@ -56,7 +56,7 @@ export class CmsEpgProgramService {
   async listPrograms(
     channelId: string | undefined,
     query: unknown,
-  ): Promise<PaginatedResult<EpgProgram>> {
+  ): Promise<PaginatedResult<EpgProgramRecord>> {
     const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
     const requestQuery = readRequestObject(query, "Query parameters");
     assertAllowedFields(requestQuery, LIST_FIELDS);
@@ -87,7 +87,7 @@ export class CmsEpgProgramService {
     programId: string | undefined,
     body: unknown,
     ifMatch?: string,
-  ): Promise<EpgProgram> {
+  ): Promise<EpgProgramRecord> {
     const requestBody = readRequestObject(body, "Request body");
     assertAllowedFields(requestBody, UPDATE_FIELDS);
 
@@ -116,7 +116,6 @@ export class CmsEpgProgramService {
       ...(hasOwn(requestBody, "endTime")
         ? { endTime: readRequiredDate(requestBody.endTime, "endTime") }
         : {}),
-      expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
     };
 
     return updateEpgProgramWithConcurrencyLock(
@@ -124,6 +123,7 @@ export class CmsEpgProgramService {
       readRequiredRouteId(channelId, "channelId"),
       readRequiredRouteId(programId, "programId"),
       input,
+      readOptionalUpdatedAtEntityTag(ifMatch),
     );
   }
 

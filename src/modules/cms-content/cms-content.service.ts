@@ -98,9 +98,12 @@ export class CmsContentService {
     ifMatch?: string,
   ): Promise<ContentRecord> {
     const id = readContentId(contentId);
-    const input = buildUpdateInput(body, ifMatch);
+    const input = buildUpdateInput(body);
+    const expectedUpdatedAt = readOptionalUpdatedAtEntityTag(ifMatch);
 
-    return this.runMutation(() => updateCmsContent(this.database, id, input));
+    return this.runMutation(() =>
+      updateCmsContent(this.database, id, input, expectedUpdatedAt),
+    );
   }
 
   async deleteContent(contentId: string | undefined): Promise<void> {
@@ -150,10 +153,7 @@ function buildCreateInput(body: unknown): ContentCreateInput {
   };
 }
 
-function buildUpdateInput(
-  body: unknown,
-  ifMatch: string | undefined,
-): ContentUpdateInput {
+function buildUpdateInput(body: unknown): ContentUpdateInput {
   const requestBody = readRequestBodyObject(body);
 
   if (Object.keys(requestBody).length === 0) {
@@ -190,7 +190,6 @@ function buildUpdateInput(
       requestBody,
       "geoBlockCountries",
     ),
-    expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
   };
 }
 

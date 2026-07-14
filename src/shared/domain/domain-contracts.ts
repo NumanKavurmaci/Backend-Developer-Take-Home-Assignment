@@ -71,7 +71,6 @@ export interface ContentUpdateInput {
   playbackUrl?: string | null;
   geoBlockCountriesOverride?: boolean;
   geoBlockCountries?: string[];
-  expectedUpdatedAt?: Date;
 }
 
 export interface ContentListQuery extends PaginationQuery {
@@ -124,6 +123,14 @@ export interface LiveChannelListQuery extends PaginationQuery {
   slug?: string;
 }
 
+export interface LiveChannelRecord {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface EpgProgramCreateInput {
   id?: string;
   channelId: string;
@@ -136,11 +143,20 @@ export interface EpgProgramUpdateInput {
   programName?: string;
   startTime?: Date;
   endTime?: Date;
-  expectedUpdatedAt?: Date;
 }
 
 export interface EpgProgramListQuery extends PaginationQuery {
   channelId: string;
   windowStart: Date;
   windowEnd: Date;
+}
+
+export interface EpgProgramRecord {
+  id: string;
+  channelId: string;
+  programName: string;
+  startTime: Date;
+  endTime: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
