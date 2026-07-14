@@ -148,7 +148,8 @@ import {
 } from "../shared/domain/domain-contracts.js";
 ```
 
-Uses the canonical content type constants from `content-types.ts`.
+Uses the canonical content type constants from
+`src/shared/domain/domain-contracts.ts`.
 
 ## Exports
 
@@ -406,22 +407,33 @@ Important behavior:
 - `geoBlockCountriesOverride` controls geo-block inheritance.
 - `geoBlockCountries` can only be provided when `geoBlockCountriesOverride` is `true`.
 
-### `ContentWithChildren`
+### `ContentRecord`
+
+Explicit persistence-independent CMS read contract. The repository uses an
+explicit Prisma `select` and field-by-field mapping, so adding a database column
+cannot silently add it to API responses.
+
+### Repository relation payloads
+
+Prisma-specific relation shapes stay local to `content-repository.ts` rather
+than leaking into the shared domain contract layer.
+
+#### `ContentWithChildren`
 
 ```ts
-export type ContentWithChildren = Content & {
-  children: Content[];
-};
+type ContentWithChildren = Prisma.ContentGetPayload<{
+  include: { children: true };
+}>;
 ```
 
 Returned by `getContentWithChildren(...)`.
 
-### `ContentWithParent`
+#### `ContentWithParent`
 
 ```ts
-export type ContentWithParent = Content & {
-  parent: Content | null;
-};
+type ContentWithParent = Prisma.ContentGetPayload<{
+  include: { parent: true };
+}>;
 ```
 
 Returned by `getContentWithParent(...)`.
@@ -704,12 +716,17 @@ import type { ResolvedContentMetadata } from
 ### `ResolvedContentMetadata`
 
 ```ts
-export type ResolvedContentMetadata = ResolvedContentBase & {
+export interface ResolvedContentMetadata {
   contentId: string;
   type: ContentType;
+  title: string;
+  parentalRating: string | null;
+  genre: string | null;
   quality: VideoQuality | null;
+  isPremium: boolean | null;
+  playbackUrl: string | null;
   geoBlockCountries: string[];
-};
+}
 ```
 
 Final resolved metadata returned by the middleware domain logic.
@@ -1090,8 +1107,8 @@ This prevents accidentally skipping `false`.
 | `ContentUpdateInput`                             | `shared/domain/domain-contracts.ts` | Yes | Input type for updating content.        |
 | `ContentListQuery`                               | `shared/domain/domain-contracts.ts` | Yes | Normalized content list query.          |
 | `ContentRecord`                                  | `shared/domain/domain-contracts.ts` | Yes | Validated content read model.           |
-| `ContentWithChildren`                            | `shared/domain/domain-contracts.ts` | Yes | Content with direct children.           |
-| `ContentWithParent`                              | `shared/domain/domain-contracts.ts` | Yes | Content with direct parent.             |
+| `ContentWithChildren`                            | `content-repository.ts`   | No       | Repository-local Prisma relation payload.     |
+| `ContentWithParent`                              | `content-repository.ts`   | No       | Repository-local Prisma relation payload.     |
 | `PaginatedResult<Item>`                          | `shared/domain/domain-contracts.ts` | Yes | Shared paginated response shape.        |
 | `MAX_CONTENT_HIERARCHY_DEPTH`                    | `content-repository.ts`   | Yes      | Safety depth limit.                           |
 | `normalizeGeoBlockCountries`                     | `content-repository.ts`   | Yes      | Normalizes and validates country codes.       |

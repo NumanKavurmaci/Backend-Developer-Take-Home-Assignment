@@ -7,8 +7,6 @@ import {
 import type {
   LiveChannelCreateInput,
   LiveChannelListQuery,
-  LiveChannelWithPrograms,
-  LiveChannelWithScheduleLock,
   LiveChannelUpdateInput,
   PaginatedResult,
 } from "../shared/domain/domain-contracts.js";
@@ -16,6 +14,14 @@ import { DomainError } from "../shared/domain/domain-error.js";
 import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
 
 type LiveChannelPrismaClient = PrismaClient | Prisma.TransactionClient;
+
+type LiveChannelWithPrograms = Prisma.LiveChannelGetPayload<{
+  include: { epgPrograms: true };
+}>;
+
+type LiveChannelWithScheduleLock = Prisma.LiveChannelGetPayload<{
+  include: { scheduleLock: true };
+}>;
 
 export async function createLiveChannel(
   prisma: LiveChannelPrismaClient,

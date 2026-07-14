@@ -39,7 +39,7 @@ LiveChannel
 
 | File                         | Responsibility                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `shared/domain/domain-contracts.ts` | Defines shared domain constants, input/query contracts, relation shapes, and pagination contracts.                    |
+| `shared/domain/domain-contracts.ts` | Defines persistence-independent domain constants, DTOs, and pagination contracts.                                    |
 | `live-channel.ts`            | Normalizes and validates live channel input before database writes.                                                          |
 | `live-channel-repository.ts` | Handles Prisma reads and writes for channels, programs, and schedule-lock lookup.                                            |
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
@@ -65,8 +65,8 @@ contracts. Names consistently describe their role:
 | `PaginatedResult<Item>`        | Shared page response used by content, channels, and EPG programs. |
 
 Saved programs use Prisma's generated `EpgProgram` type directly; there is no
-pass-through record alias. Schedule-lock relations likewise use the generated
-`EpgScheduleLock` type instead of repeating its fields by hand.
+pass-through record alias. Prisma relation payloads for programs and schedule
+locks remain local to `live-channel-repository.ts`.
 
 ### `epg-program.ts`
 

@@ -1,5 +1,3 @@
-import type { Content, Prisma } from "@prisma/client";
-
 export const CONTENT_TYPES = {
   SERIES: "SERIES",
   SEASON: "SEASON",
@@ -82,29 +80,33 @@ export interface ContentListQuery extends PaginationQuery {
   title?: string;
 }
 
-export type ContentRecord = Omit<Content, "type" | "quality"> & {
+export interface ContentRecord {
+  id: string;
   type: ContentType;
+  title: string;
+  parentId: string | null;
+  parentalRating: string | null;
+  genre: string | null;
   quality: VideoQuality | null;
+  isPremium: boolean | null;
+  playbackUrl: string | null;
+  geoBlockCountriesOverride: boolean;
   geoBlockCountries: string[];
-};
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export type ContentWithChildren = Prisma.ContentGetPayload<{
-  include: { children: true };
-}>;
-
-export type ContentWithParent = Prisma.ContentGetPayload<{
-  include: { parent: true };
-}>;
-
-export type ResolvedContentMetadata = Pick<
-  Content,
-  "title" | "parentalRating" | "genre" | "isPremium" | "playbackUrl"
-> & {
+export interface ResolvedContentMetadata {
   contentId: string;
   type: ContentType;
+  title: string;
+  parentalRating: string | null;
+  genre: string | null;
   quality: VideoQuality | null;
+  isPremium: boolean | null;
+  playbackUrl: string | null;
   geoBlockCountries: string[];
-};
+}
 
 export interface LiveChannelCreateInput {
   id?: string;
@@ -121,14 +123,6 @@ export interface LiveChannelListQuery extends PaginationQuery {
   name?: string;
   slug?: string;
 }
-
-export type LiveChannelWithPrograms = Prisma.LiveChannelGetPayload<{
-  include: { epgPrograms: true };
-}>;
-
-export type LiveChannelWithScheduleLock = Prisma.LiveChannelGetPayload<{
-  include: { scheduleLock: true };
-}>;
 
 export interface EpgProgramCreateInput {
   id?: string;

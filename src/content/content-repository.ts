@@ -8,8 +8,6 @@ import type {
   ContentListQuery,
   ContentRecord,
   ContentUpdateInput,
-  ContentWithChildren,
-  ContentWithParent,
   PaginatedResult,
 } from "../shared/domain/domain-contracts.js";
 import { isPrismaErrorCode } from "../db/database-error.js";
@@ -94,14 +92,34 @@ export async function createContent(
   });
 }
 
-const cmsContentInclude = {
+const cmsContentSelect = {
+  id: true,
+  type: true,
+  title: true,
+  parentId: true,
+  parentalRating: true,
+  genre: true,
+  quality: true,
+  isPremium: true,
+  playbackUrl: true,
+  geoBlockCountriesOverride: true,
+  createdAt: true,
+  updatedAt: true,
   geoBlockCountries: {
     orderBy: { countryCode: "asc" },
   },
-} satisfies Prisma.ContentInclude;
+} satisfies Prisma.ContentSelect;
 
 type ContentWithGeoBlockRows = Prisma.ContentGetPayload<{
-  include: typeof cmsContentInclude;
+  select: typeof cmsContentSelect;
+}>;
+
+type ContentWithChildren = Prisma.ContentGetPayload<{
+  include: { children: true };
+}>;
+
+type ContentWithParent = Prisma.ContentGetPayload<{
+  include: { parent: true };
 }>;
 
 export async function createCmsContent(
@@ -147,7 +165,7 @@ export async function createCmsContent(
           geoBlockCountriesOverride,
           geoBlockCountries: createGeoBlockCountryRows(geoBlockCountries),
         },
-        include: cmsContentInclude,
+        select: cmsContentSelect,
       });
     });
 
@@ -163,7 +181,7 @@ export async function getCmsContent(
 ): Promise<ContentRecord | null> {
   const content = await prisma.content.findUnique({
     where: { id: contentId },
-    include: cmsContentInclude,
+    select: cmsContentSelect,
   });
 
   return content ? toContentRecord(content) : null;
@@ -183,7 +201,7 @@ export async function listCmsContent(
   const [contents, total] = await prisma.$transaction([
     prisma.content.findMany({
       where,
-      include: cmsContentInclude,
+      select: cmsContentSelect,
       orderBy: [{ title: "asc" }, { id: "asc" }],
       skip: (input.page - 1) * input.pageSize,
       take: input.pageSize,
@@ -208,7 +226,7 @@ export async function updateCmsContent(
     const content = await prisma.$transaction(async (transaction) => {
       const current = await transaction.content.findUnique({
         where: { id: contentId },
-        include: cmsContentInclude,
+        select: cmsContentSelect,
       });
 
       if (!current) {
@@ -294,7 +312,7 @@ export async function updateCmsContent(
 
       const updated = await transaction.content.findUnique({
         where: { id: contentId },
-        include: cmsContentInclude,
+        select: cmsContentSelect,
       });
 
       if (!updated) {
@@ -402,12 +420,21 @@ function toContentRecord(
   assertVideoQuality(content.quality);
 
   return {
-    ...content,
+    id: content.id,
     type: content.type,
+    title: content.title,
+    parentId: content.parentId,
+    parentalRating: content.parentalRating,
+    genre: content.genre,
     quality: content.quality,
+    isPremium: content.isPremium,
+    playbackUrl: content.playbackUrl,
+    geoBlockCountriesOverride: content.geoBlockCountriesOverride,
     geoBlockCountries: content.geoBlockCountries.map(
       ({ countryCode }) => countryCode,
     ),
+    createdAt: content.createdAt,
+    updatedAt: content.updatedAt,
   };
 }
 
