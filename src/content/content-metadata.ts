@@ -1,38 +1,8 @@
 import { DomainError } from "../shared/domain/domain-error.js";
-
-export const INHERITABLE_METADATA_FIELDS = [
-  "parentalRating",
-  "genre",
-  "quality",
-  "isPremium",
-  "playbackUrl",
-  "geoBlockCountries",
-] as const;
-
-export type InheritableMetadataField =
-  (typeof INHERITABLE_METADATA_FIELDS)[number];
-
-// Playback authorization depends on these resolved fields, so they are tracked explicitly.
-export const PLAYBACK_METADATA_FIELDS = [
-  "quality",
-  "isPremium",
-  "playbackUrl",
-  "geoBlockCountries",
-] as const;
-
-export type PlaybackMetadataField = (typeof PLAYBACK_METADATA_FIELDS)[number];
-
-// Stored as strings in PostgreSQL, validated in the domain layer before writes.
-export const VIDEO_QUALITIES = {
-  SD: "SD",
-  HD: "HD",
-  UHD_4K: "UHD_4K",
-} as const;
-
-export type VideoQuality =
-  (typeof VIDEO_QUALITIES)[keyof typeof VIDEO_QUALITIES];
-
-export const VIDEO_QUALITY_VALUES = Object.values(VIDEO_QUALITIES);
+import {
+  VIDEO_QUALITY_VALUES,
+  type VideoQuality,
+} from "../shared/domain/domain-contracts.js";
 
 export function isVideoQuality(value: string): value is VideoQuality {
   return VIDEO_QUALITY_VALUES.includes(value as VideoQuality);

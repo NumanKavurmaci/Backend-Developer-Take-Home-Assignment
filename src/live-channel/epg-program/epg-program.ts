@@ -1,7 +1,7 @@
 import type {
-  CreateEpgProgramInput,
-  UpdateEpgProgramInput,
-} from "./epg-program-types.js";
+  EpgProgramCreateInput,
+  EpgProgramUpdateInput,
+} from "../../shared/domain/domain-contracts.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 
 export function normalizeEpgProgramName(programName: string): string {
@@ -38,7 +38,7 @@ export function assertValidEpgProgramTimeRange(
   }
 }
 
-export function assertValidEpgProgramInput(input: CreateEpgProgramInput): void {
+export function assertValidEpgProgramInput(input: EpgProgramCreateInput): void {
   if (!normalizeEpgProgramChannelId(input.channelId)) {
     throw new DomainError(
       "INVALID_REQUEST_BODY",
@@ -57,8 +57,8 @@ export function assertValidEpgProgramInput(input: CreateEpgProgramInput): void {
 }
 
 export function prepareEpgProgramCreateInput(
-  input: CreateEpgProgramInput,
-): CreateEpgProgramInput {
+  input: EpgProgramCreateInput,
+): EpgProgramCreateInput {
   assertValidEpgProgramInput(input);
 
   return {
@@ -71,9 +71,9 @@ export function prepareEpgProgramCreateInput(
 }
 
 export function prepareEpgProgramUpdateInput(
-  current: CreateEpgProgramInput,
-  input: UpdateEpgProgramInput,
-): UpdateEpgProgramInput {
+  current: EpgProgramCreateInput,
+  input: EpgProgramUpdateInput,
+): EpgProgramUpdateInput {
   const programName =
     input.programName === undefined
       ? current.programName

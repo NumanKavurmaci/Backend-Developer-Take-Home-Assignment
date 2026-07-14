@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@prisma/client";
+import type { EpgProgram, Prisma, PrismaClient } from "@prisma/client";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import { nextEntityUpdatedAt } from "../../shared/http/entity-tag.js";
 import {
@@ -8,19 +8,18 @@ import {
 } from "./epg-program.js";
 import { toEpgProgramDomainError } from "./epg-program-error-mapper.js";
 import type {
-  CreateEpgProgramInput,
-  EpgProgramListOptions,
-  EpgProgramPage,
-  EpgProgramRecord,
-  UpdateEpgProgramInput,
-} from "./epg-program-types.js";
+  EpgProgramCreateInput,
+  EpgProgramListQuery,
+  EpgProgramUpdateInput,
+  PaginatedResult,
+} from "../../shared/domain/domain-contracts.js";
 
 type EpgProgramPrismaClient = PrismaClient | Prisma.TransactionClient;
 
 export async function createEpgProgram(
   prisma: EpgProgramPrismaClient,
-  input: CreateEpgProgramInput,
-): Promise<EpgProgramRecord> {
+  input: EpgProgramCreateInput,
+): Promise<EpgProgram> {
   const data = prepareEpgProgramCreateInput(input);
   await assertNoOverlappingEpgProgram(prisma, data);
 
@@ -46,8 +45,8 @@ export async function createEpgProgram(
  */
 export async function createEpgProgramWithConcurrencyLock(
   prisma: PrismaClient,
-  input: CreateEpgProgramInput,
-): Promise<EpgProgramRecord> {
+  input: EpgProgramCreateInput,
+): Promise<EpgProgram> {
   const data = prepareEpgProgramCreateInput(input);
 
   try {
@@ -63,7 +62,7 @@ export async function createEpgProgramWithConcurrencyLock(
 
 export async function assertNoOverlappingEpgProgram(
   prisma: EpgProgramPrismaClient,
-  input: CreateEpgProgramInput,
+  input: EpgProgramCreateInput,
   excludedProgramId?: string,
 ): Promise<void> {
   const data = prepareEpgProgramCreateInput(input);
@@ -100,7 +99,7 @@ export async function getEpgProgram(
   prisma: EpgProgramPrismaClient,
   channelId: string,
   programId: string,
-): Promise<EpgProgramRecord> {
+): Promise<EpgProgram> {
   const program = await prisma.epgProgram.findFirst({
     where: {
       id: programId,
@@ -117,8 +116,8 @@ export async function getEpgProgram(
 
 export async function listEpgPrograms(
   prisma: PrismaClient,
-  options: EpgProgramListOptions,
-): Promise<EpgProgramPage> {
+  options: EpgProgramListQuery,
+): Promise<PaginatedResult<EpgProgram>> {
   const channelId = normalizeEpgProgramChannelId(options.channelId);
   await assertChannelExists(prisma, channelId);
 
@@ -151,8 +150,8 @@ export async function updateEpgProgramWithConcurrencyLock(
   prisma: PrismaClient,
   channelId: string,
   programId: string,
-  input: UpdateEpgProgramInput,
-): Promise<EpgProgramRecord> {
+  input: EpgProgramUpdateInput,
+): Promise<EpgProgram> {
   const normalizedChannelId = normalizeEpgProgramChannelId(channelId);
 
   try {
@@ -176,7 +175,7 @@ export async function updateEpgProgramWithConcurrencyLock(
       }
 
       const data = prepareEpgProgramUpdateInput(current, input);
-      const effectiveInput: CreateEpgProgramInput = {
+      const effectiveInput: EpgProgramCreateInput = {
         channelId: normalizedChannelId,
         programName: data.programName ?? current.programName,
         startTime: data.startTime ?? current.startTime,

@@ -1,69 +1,19 @@
 import type { Content, Prisma, PrismaClient } from "@prisma/client";
-import { assertContentType, type ContentType } from "./content-types.js";
-import {
-  assertVideoQuality,
-  type VideoQuality,
-} from "./content-metadata.js";
+import { assertContentType } from "./content-types.js";
+import { assertVideoQuality } from "./content-metadata.js";
 import { validateContentParent } from "./content-hierarchy.js";
 import { DomainError } from "../shared/domain/domain-error.js";
+import type {
+  ContentCreateInput,
+  ContentListQuery,
+  ContentRecord,
+  ContentUpdateInput,
+  ContentWithChildren,
+  ContentWithParent,
+  PaginatedResult,
+} from "../shared/domain/domain-contracts.js";
 import { isPrismaErrorCode } from "../db/database-error.js";
 import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
-
-export type CreateContentInput = {
-  id?: string;
-  type: ContentType;
-  title: string;
-  parentId?: string | null;
-  parentalRating?: string | null;
-  genre?: string | null;
-  quality?: VideoQuality | null;
-  isPremium?: boolean | null;
-  playbackUrl?: string | null;
-  geoBlockCountriesOverride?: boolean;
-  geoBlockCountries?: string[];
-};
-
-export type CmsContentRecord = Omit<Content, "type" | "quality"> & {
-  type: ContentType;
-  quality: VideoQuality | null;
-  geoBlockCountries: string[];
-};
-
-export type ListCmsContentInput = {
-  type?: ContentType;
-  parentId?: string;
-  title?: string;
-  page: number;
-  pageSize: number;
-};
-
-export type ListCmsContentResult = {
-  items: CmsContentRecord[];
-  page: number;
-  pageSize: number;
-  total: number;
-};
-
-export type UpdateCmsContentInput = {
-  title?: string;
-  parentId?: string | null;
-  parentalRating?: string | null;
-  genre?: string | null;
-  quality?: VideoQuality | null;
-  isPremium?: boolean | null;
-  playbackUrl?: string | null;
-  geoBlockCountriesOverride?: boolean;
-  geoBlockCountries?: string[];
-  expectedUpdatedAt?: Date;
-};
-
-export type ContentWithChildren = Content & {
-  children: Content[];
-};
-
-export type ContentWithParent = Content & {
-  parent: Content | null;
-};
 
 // Safety limit for corrupted or unexpectedly deep hierarchy data, not a business depth rule.
 export const MAX_CONTENT_HIERARCHY_DEPTH = 10;
@@ -103,7 +53,7 @@ function createGeoBlockCountryRows(geoBlockCountries: string[]) {
 
 export async function createContent(
   prisma: PrismaClient,
-  input: CreateContentInput,
+  input: ContentCreateInput,
 ): Promise<Content> {
   assertContentType(input.type);
   assertVideoQuality(input.quality);
@@ -156,8 +106,8 @@ type ContentWithGeoBlockRows = Prisma.ContentGetPayload<{
 
 export async function createCmsContent(
   prisma: PrismaClient,
-  input: CreateContentInput,
-): Promise<CmsContentRecord> {
+  input: ContentCreateInput,
+): Promise<ContentRecord> {
   try {
     const content = await prisma.$transaction(async (transaction) => {
       assertContentType(input.type);
@@ -201,7 +151,7 @@ export async function createCmsContent(
       });
     });
 
-    return toCmsContentRecord(content);
+    return toContentRecord(content);
   } catch (error) {
     throw toContentWriteError(error);
   }
@@ -210,19 +160,19 @@ export async function createCmsContent(
 export async function getCmsContent(
   prisma: PrismaClient,
   contentId: string,
-): Promise<CmsContentRecord | null> {
+): Promise<ContentRecord | null> {
   const content = await prisma.content.findUnique({
     where: { id: contentId },
     include: cmsContentInclude,
   });
 
-  return content ? toCmsContentRecord(content) : null;
+  return content ? toContentRecord(content) : null;
 }
 
 export async function listCmsContent(
   prisma: PrismaClient,
-  input: ListCmsContentInput,
-): Promise<ListCmsContentResult> {
+  input: ContentListQuery,
+): Promise<PaginatedResult<ContentRecord>> {
   const where: Prisma.ContentWhereInput = {
     type: input.type,
     parentId: input.parentId,
@@ -242,7 +192,7 @@ export async function listCmsContent(
   ]);
 
   return {
-    items: contents.map(toCmsContentRecord),
+    items: contents.map(toContentRecord),
     page: input.page,
     pageSize: input.pageSize,
     total,
@@ -252,8 +202,8 @@ export async function listCmsContent(
 export async function updateCmsContent(
   prisma: PrismaClient,
   contentId: string,
-  input: UpdateCmsContentInput,
-): Promise<CmsContentRecord> {
+  input: ContentUpdateInput,
+): Promise<ContentRecord> {
   try {
     const content = await prisma.$transaction(async (transaction) => {
       const current = await transaction.content.findUnique({
@@ -354,7 +304,7 @@ export async function updateCmsContent(
       return updated;
     });
 
-    return toCmsContentRecord(content);
+    return toContentRecord(content);
   } catch (error) {
     throw toContentWriteError(error);
   }
@@ -445,9 +395,9 @@ async function assertReparentingDoesNotCreateCycle(
   }
 }
 
-function toCmsContentRecord(
+function toContentRecord(
   content: ContentWithGeoBlockRows,
-): CmsContentRecord {
+): ContentRecord {
   assertContentType(content.type);
   assertVideoQuality(content.quality);
 

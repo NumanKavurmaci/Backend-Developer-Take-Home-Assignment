@@ -9,15 +9,16 @@ Live channels represent linear TV channels. Each channel can own many EPG progra
 ```text
 src/live-channel/
   live-channel.ts
-  live-channel-types.ts
   live-channel-repository.ts
   live-channel.test.ts
   epg-program/
     epg-program.ts
     epg-program-error-mapper.ts
-    epg-program-types.ts
     epg-program-repository.ts
     epg-program.test.ts
+
+src/shared/domain/
+  domain-contracts.ts
 ```
 
 ## Main Model
@@ -38,8 +39,8 @@ LiveChannel
 
 | File                         | Responsibility                                                                                                               |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `shared/domain/domain-contracts.ts` | Defines shared domain constants, input/query contracts, relation shapes, and pagination contracts.                    |
 | `live-channel.ts`            | Normalizes and validates live channel input before database writes.                                                          |
-| `live-channel-types.ts`      | Defines live-channel input and read model TypeScript types.                                                                  |
 | `live-channel-repository.ts` | Handles Prisma reads and writes for channels, programs, and schedule-lock lookup.                                            |
 | `live-channel.test.ts`       | Covers live-channel normalization, validation, repository reads, schedule-lock creation, and channel-scoped program loading. |
 | `epg-program/`               | Defines scheduled-program input validation, creation types, repository writes, invalid date checks, invalid time-range rejection, overlap checks, and per-channel concurrency-safe creation. |
@@ -48,12 +49,24 @@ LiveChannel
 
 EPG programs are stored under `src/live-channel/epg-program/` because they are scheduled inside a specific live channel. The channel boundary matters for overlap validation and concurrency protection.
 
-### `epg-program-types.ts`
+### Shared domain contracts
 
-| Export                  | Purpose |
-| ----------------------- | ------- |
-| `EpgProgramRecord`      | Database/read shape returned after an EPG program has been saved. This aliases Prisma's generated `EpgProgram` type. |
-| `CreateEpgProgramInput` | Create/write shape accepted before Prisma adds database-managed fields like `createdAt` and `updatedAt`. |
+`src/shared/domain/domain-contracts.ts` is the single home for domain data
+contracts. Names consistently describe their role:
+
+| Export                         | Purpose |
+| ------------------------------ | ------- |
+| `LiveChannelCreateInput`       | Normalized channel create data. |
+| `LiveChannelUpdateInput`       | Mutable channel fields. |
+| `LiveChannelListQuery`         | Normalized channel filters and pagination. |
+| `EpgProgramCreateInput`        | Program create data before Prisma adds database-managed fields. |
+| `EpgProgramUpdateInput`        | Mutable program fields and optional optimistic-concurrency timestamp. |
+| `EpgProgramListQuery`          | Channel, schedule window, and pagination filters. |
+| `PaginatedResult<Item>`        | Shared page response used by content, channels, and EPG programs. |
+
+Saved programs use Prisma's generated `EpgProgram` type directly; there is no
+pass-through record alias. Schedule-lock relations likewise use the generated
+`EpgScheduleLock` type instead of repeating its fields by hand.
 
 ### `epg-program.ts`
 

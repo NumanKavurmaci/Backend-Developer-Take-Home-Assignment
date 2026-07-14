@@ -1,3 +1,4 @@
+import type { EpgProgram } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import {
   assertValidEpgProgramTimeRange,
@@ -11,11 +12,10 @@ import {
   updateEpgProgramWithConcurrencyLock,
 } from "../../live-channel/epg-program/epg-program-repository.js";
 import type {
-  CreateEpgProgramInput,
-  EpgProgramPage,
-  EpgProgramRecord,
-  UpdateEpgProgramInput,
-} from "../../live-channel/epg-program/epg-program-types.js";
+  EpgProgramCreateInput,
+  EpgProgramUpdateInput,
+  PaginatedResult,
+} from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
@@ -36,7 +36,7 @@ export class CmsEpgProgramService {
   async createProgram(
     channelId: string | undefined,
     body: unknown,
-  ): Promise<EpgProgramRecord> {
+  ): Promise<EpgProgram> {
     const createInput = buildCreateInput(channelId, body);
 
     return createEpgProgramWithConcurrencyLock(prisma, createInput);
@@ -45,7 +45,7 @@ export class CmsEpgProgramService {
   async getProgram(
     channelId: string | undefined,
     programId: string | undefined,
-  ): Promise<EpgProgramRecord> {
+  ): Promise<EpgProgram> {
     return getEpgProgram(
       prisma,
       readRequiredRouteId(channelId, "channelId"),
@@ -56,7 +56,7 @@ export class CmsEpgProgramService {
   async listPrograms(
     channelId: string | undefined,
     query: unknown,
-  ): Promise<EpgProgramPage> {
+  ): Promise<PaginatedResult<EpgProgram>> {
     const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
     const requestQuery = readRequestObject(query, "Query parameters");
     assertAllowedFields(requestQuery, LIST_FIELDS);
@@ -87,7 +87,7 @@ export class CmsEpgProgramService {
     programId: string | undefined,
     body: unknown,
     ifMatch?: string,
-  ): Promise<EpgProgramRecord> {
+  ): Promise<EpgProgram> {
     const requestBody = readRequestObject(body, "Request body");
     assertAllowedFields(requestBody, UPDATE_FIELDS);
 
@@ -99,7 +99,7 @@ export class CmsEpgProgramService {
       );
     }
 
-    const input: UpdateEpgProgramInput = {
+    const input: EpgProgramUpdateInput = {
       ...(hasOwn(requestBody, "programName")
         ? {
             programName: readRequiredString(
@@ -142,7 +142,7 @@ export class CmsEpgProgramService {
 function buildCreateInput(
   channelId: string | undefined,
   body: unknown,
-): CreateEpgProgramInput {
+): EpgProgramCreateInput {
   const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
   const requestBody = readRequestObject(body, "Request body");
   assertAllowedFields(requestBody, CREATE_FIELDS);

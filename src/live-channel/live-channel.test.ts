@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { clearLiveChannelTables } from "../test/test-database.js";
-import type { EpgProgramRecord } from "./epg-program/epg-program-types.js";
+import type { EpgProgram } from "@prisma/client";
 import {
   assertValidLiveChannelInput,
   normalizeLiveChannelName,
@@ -64,7 +64,7 @@ function rejectedResults<T>(
   );
 }
 
-function expectNoOverlappingPrograms(programs: EpgProgramRecord[]): void {
+function expectNoOverlappingPrograms(programs: EpgProgram[]): void {
   const orderedPrograms = [...programs].sort(
     (left, right) => left.startTime.getTime() - right.startTime.getTime(),
   );

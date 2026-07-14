@@ -5,8 +5,10 @@ import {
   clearContentTables,
   clearLiveChannelTables,
 } from "../test/test-database.js";
-import { CONTENT_TYPES } from "../content/content-types.js";
-import { VIDEO_QUALITIES } from "../content/content-metadata.js";
+import {
+  CONTENT_TYPES,
+  VIDEO_QUALITIES,
+} from "../shared/domain/domain-contracts.js";
 import { createLiveChannel } from "../live-channel/live-channel-repository.js";
 import {
   EPG_TIME_RANGE_CONSTRAINT,

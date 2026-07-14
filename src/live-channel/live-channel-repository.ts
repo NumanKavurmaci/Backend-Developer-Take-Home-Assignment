@@ -5,13 +5,13 @@ import {
   prepareLiveChannelUpdateInput,
 } from "./live-channel.js";
 import type {
-  CreateLiveChannelInput,
-  LiveChannelListOptions,
-  LiveChannelPage,
+  LiveChannelCreateInput,
+  LiveChannelListQuery,
   LiveChannelWithPrograms,
   LiveChannelWithScheduleLock,
-  UpdateLiveChannelInput,
-} from "./live-channel-types.js";
+  LiveChannelUpdateInput,
+  PaginatedResult,
+} from "../shared/domain/domain-contracts.js";
 import { DomainError } from "../shared/domain/domain-error.js";
 import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
 
@@ -19,7 +19,7 @@ type LiveChannelPrismaClient = PrismaClient | Prisma.TransactionClient;
 
 export async function createLiveChannel(
   prisma: LiveChannelPrismaClient,
-  input: CreateLiveChannelInput,
+  input: LiveChannelCreateInput,
 ): Promise<LiveChannel> {
   const data = prepareLiveChannelCreateInput(input);
 
@@ -73,8 +73,8 @@ export async function listLiveChannels(
 
 export async function listLiveChannelsPage(
   prisma: PrismaClient,
-  options: LiveChannelListOptions,
-): Promise<LiveChannelPage> {
+  options: LiveChannelListQuery,
+): Promise<PaginatedResult<LiveChannel>> {
   const where: Prisma.LiveChannelWhereInput = {
     ...(options.name
       ? { name: { contains: options.name, mode: "insensitive" } }
@@ -105,7 +105,7 @@ export async function listLiveChannelsPage(
 export async function updateLiveChannel(
   prisma: PrismaClient,
   channelId: string,
-  input: UpdateLiveChannelInput,
+  input: LiveChannelUpdateInput,
   expectedUpdatedAt?: Date,
 ): Promise<LiveChannel> {
   const data = prepareLiveChannelUpdateInput(input);

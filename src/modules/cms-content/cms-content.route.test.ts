@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
-import { CONTENT_TYPES } from "../../content/content-types.js";
+import { CONTENT_TYPES } from "../../shared/domain/domain-contracts.js";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
 import { CmsContentController } from "./cms-content.controller.js";
 import { createCmsContentRoutes } from "./cms-content.route.js";

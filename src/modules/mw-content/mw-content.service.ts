@@ -1,8 +1,6 @@
 import { prisma } from "../../db/client.js";
-import {
-  resolveContentMetadata,
-  type ResolvedContentMetadata,
-} from "../../content/metadata-inheritance.js";
+import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
+import type { ResolvedContentMetadata } from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 
 export type PublicContentResponse = Omit<

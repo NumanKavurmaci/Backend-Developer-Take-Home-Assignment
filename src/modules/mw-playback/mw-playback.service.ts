@@ -1,10 +1,10 @@
-import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
 import { prisma } from "../../db/client.js";
-import {
-  resolveContentMetadata,
-  type ResolvedContentMetadata,
-} from "../../content/metadata-inheritance.js";
+import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
+import {
+  VIDEO_QUALITIES,
+  type ResolvedContentMetadata,
+} from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import type { PlaybackRequestHeaders } from "./playback-request-headers.js";
 
@@ -101,7 +101,8 @@ export class MwPlaybackService {
     metadata: ResolvedContentMetadata,
   ): void {
     const isPremium4K =
-      metadata.isPremium === true && metadata.quality === VIDEO_QUALITIES.UHD_4K;
+      metadata.isPremium === true &&
+      metadata.quality === VIDEO_QUALITIES.UHD_4K;
 
     if (isPremium4K && requestContext.deviceType === "Mobile") {
       throw new DomainError(

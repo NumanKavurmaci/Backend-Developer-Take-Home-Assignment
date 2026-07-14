@@ -7,8 +7,8 @@ import {
   listLiveChannelsPage,
   updateLiveChannel,
 } from "../../live-channel/live-channel-repository.js";
-import type { LiveChannelPage } from "../../live-channel/live-channel-types.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
+import type { PaginatedResult } from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
@@ -18,7 +18,7 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-export type LiveChannelListQuery = {
+export type CmsLiveChannelListRequestQuery = {
   name?: string;
   slug?: string;
   page?: string;
@@ -51,7 +51,9 @@ export class CmsLiveChannelService {
     return channel;
   }
 
-  async listChannels(query: LiveChannelListQuery): Promise<LiveChannelPage> {
+  async listChannels(
+    query: CmsLiveChannelListRequestQuery,
+  ): Promise<PaginatedResult<LiveChannel>> {
     const page = readPositiveInteger(query.page, "page", DEFAULT_PAGE);
     const pageSize = readPositiveInteger(
       query.pageSize,

@@ -1,7 +1,9 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { CONTENT_TYPES } from "../../content/content-types.js";
-import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
+import {
+  CONTENT_TYPES,
+  VIDEO_QUALITIES,
+} from "../../shared/domain/domain-contracts.js";
 import { createContent } from "../../content/content-repository.js";
 import { clearContentTables } from "../../test/test-database.js";
 import { MwContentService } from "./mw-content.service.js";
