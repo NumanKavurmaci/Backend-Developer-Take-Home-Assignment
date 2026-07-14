@@ -96,7 +96,7 @@ The `parentId` column links one content item to its parent:
 
 `MOVIE` is included because the playback requirement mentions premium 4K movies.
 
-The database stores the parent relationship. The application code will validate that the parent type is correct.
+The database stores the parent relationship. The application code validates that the parent type is correct.
 
 Hierarchy validation lives in the content domain layer:
 

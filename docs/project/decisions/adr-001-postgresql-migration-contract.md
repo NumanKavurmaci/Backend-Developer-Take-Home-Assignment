@@ -7,7 +7,7 @@
 
 ## Context
 
-The application currently uses SQLite through Prisma. Its migration history, setup scripts, test isolation, CI configuration, and parts of its EPG concurrency strategy are SQLite-specific. Prisma migration SQL is provider-specific, so one active migration history cannot safely manage both SQLite and PostgreSQL.
+At the time of this decision, the application used SQLite through Prisma. Its migration history, setup scripts, test isolation, CI configuration, and parts of its EPG concurrency strategy were SQLite-specific. Prisma migration SQL is provider-specific, so one active migration history cannot safely manage both SQLite and PostgreSQL.
 
 The application also needs a database-level guarantee that programs on one channel do not overlap. PostgreSQL supports the row-level locking and exclusion constraints planned for that invariant.
 
@@ -46,13 +46,13 @@ Changing a public API contract requires a separate, explicit decision and is not
 
 ## Migration History
 
-The existing files under `prisma/migrations/` are SQLite-specific. During PG-03 they will be moved to a clearly named archive outside the active Prisma migration directory (or remain available in Git history) and must not be applied to PostgreSQL.
+The SQLite-specific files that previously lived under `prisma/migrations/` were moved to `prisma/migrations-sqlite/` during PG-03. They must not be applied to PostgreSQL.
 
-PG-03 will create a new PostgreSQL initial migration from the preserved logical schema. From that point, the active migration history targets PostgreSQL only. Archived SQLite SQL is historical evidence, not a supported rollback path or deployable migration set.
+PG-03 created a new PostgreSQL initial migration from the preserved logical schema. The active migration history now targets PostgreSQL only. Archived SQLite SQL is historical evidence, not a supported rollback path or deployable migration set.
 
 ## Data Preservation
 
-The repository's current SQLite records are demo data, not a production system of record. They will **not** be copied row by row. The PostgreSQL schema will be created from committed migrations, and demo content, channels, schedule-lock rows, and EPG programs will be recreated from [`prisma/seed.ts`](../../../prisma/seed.ts).
+The repository's SQLite records were demo data, not a production system of record. They were **not** copied row by row. The PostgreSQL schema is created from committed migrations, and demo content, channels, schedule-lock rows, and EPG programs are recreated from [`prisma/seed.ts`](../../../prisma/seed.ts).
 
 Production data extraction, transformation, or bulk copy is out of scope. No unresolved data-preservation decision remains for the known repository data. If real persistent data is identified before cutover, the cutover must pause and a separate, reviewed data-migration plan must define reconciliation, validation, backup, and rollback before that data is changed.
 

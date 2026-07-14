@@ -2,7 +2,12 @@
 
 Source: [SaatCMS Technical Improvement Recommendations](../reviews/SaatCMS_Technical_Improvement_Recommendations.md)
 
-These steps convert the technical review findings into an actionable post-release project plan. Each step includes the implementation goal, acceptance criteria, and the tests or automated checks that should be added before the step is considered complete.
+**Status: Complete.** These steps record the work performed in response to the
+technical review. The README and the database, domain, API, and CI/CD guides are
+the source of truth for the current implementation.
+
+Each step preserves its original implementation goal, acceptance criteria, and
+planned checks as historical delivery context.
 
 ---
 
@@ -36,7 +41,7 @@ Remove protected playback asset data from the public content metadata endpoint. 
 
 ### Description
 
-Move automated tests away from the configured development SQLite database. Tests should run against a disposable database created for the suite and removed afterward. Add safety checks so a test run cannot accidentally clear seeded development data.
+Move automated tests away from the configured development database. Tests now run against isolated PostgreSQL databases created for test workers and removed afterward. Safety checks prevent a test run from clearing development or deployed data.
 
 ### Acceptance Criteria
 
@@ -49,7 +54,7 @@ Move automated tests away from the configured development SQLite database. Tests
 
 ### Tests to Implement
 
-- Test setup guard: throws when destructive test cleanup targets the development database path.
+- Test setup guard: throws when destructive test cleanup targets a development or deployed PostgreSQL database.
 - Test setup integration test: creates a fresh test database from migrations.
 - Test teardown integration test: removes or resets test data without touching the development database.
 - Suite isolation test: data created in one test does not leak into another test.
@@ -69,7 +74,7 @@ Expand concurrency testing beyond a single shared Prisma client. The current per
 - A burst of overlapping writes to the same channel inserts exactly one row.
 - Concurrent writes to different channels are isolated from each other.
 - Back-to-back schedules remain valid under the concurrency path.
-- The concurrency strategy and its SQLite/PostgreSQL limitations are documented.
+- The PostgreSQL concurrency strategy and its database-level guarantees are documented.
 
 ### Tests to Implement
 
@@ -221,23 +226,22 @@ Add request correlation and production diagnostics. The service should accept or
 
 ### Description
 
-Define the environment strategy for local development, tests, and shared deployments. SQLite can remain the local default, but shared demo or production environments should use PostgreSQL or another durable database.
+Use PostgreSQL 18 consistently for local development, automated tests, CI, and shared deployments. Local Docker Compose provides development and test databases, while shared deployments use managed PostgreSQL.
 
 ### Acceptance Criteria
 
-- Local development database strategy remains simple and documented.
-- Automated tests use disposable SQLite.
-- Shared demo or production environments use PostgreSQL or durable storage.
-- Production startup fails fast when configured with an unsafe ephemeral database URL.
+- Local development uses PostgreSQL 18 through Docker Compose and is documented.
+- Automated tests use isolated PostgreSQL databases with destructive-operation guards.
+- Shared demo or production environments use managed PostgreSQL 18.
+- Production startup fails fast when database configuration is missing or unsafe.
 - Migrations are repeatable in fresh environments.
 - Deployment documentation explains database setup and migration commands.
 
 ### Tests and Checks to Implement
 
-- Configuration test: production mode rejects a SQLite file URL unless explicitly allowed for local-only runs.
+- Configuration test: every environment rejects unsupported non-PostgreSQL database URLs.
 - Configuration test: missing `DATABASE_URL` fails with a clear startup error.
-- Migration smoke check: migrations apply cleanly to SQLite.
-- PostgreSQL migration smoke check: migrations apply cleanly to PostgreSQL in CI or a documented local container.
+- PostgreSQL migration smoke check: migrations apply cleanly in CI or a documented local container.
 - Repository integration test: EPG overlap and content metadata flows pass against the deployment database target.
 - Startup smoke check: application boots with the documented deployment environment variables.
 

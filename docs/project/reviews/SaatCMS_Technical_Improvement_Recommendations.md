@@ -6,7 +6,7 @@
 **Review scope:** Architecture, domain logic, data integrity, concurrency, testing, documentation, and deployment readiness  
 **Date:** 11 July 2026
 
-**Status note:** This document records the technical review findings as originally identified. Current implementation progress is tracked in [post-release-fixes.md](../plans/post-release-fixes.md), and the README plus domain/API docs are the current source of truth.
+**Status note:** This document records the technical review findings as originally identified. The work tracked in [post-release-fixes.md](../plans/post-release-fixes.md) is complete. The README plus the database, domain, API, and CI/CD docs are the current source of truth; findings below are retained as historical review context.
 
 ---
 

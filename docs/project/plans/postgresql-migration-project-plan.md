@@ -1,5 +1,11 @@
 # SQLite to PostgreSQL Migration Project Plan
 
+**Status: Complete.** This is the historical delivery plan for the provider
+switch. PostgreSQL 18 is now the only active provider in local development,
+tests, CI, and deployment. For current setup and operations, use the
+[README](../../../README.md), [database guide](../../database/database-structure.md),
+and [deployment runbook](../../ci-cd/deployment-runbook.md).
+
 ## Recommended Migration Strategy
 
 The migration should be a complete provider switch:
@@ -13,13 +19,16 @@ Demo/production   -> Managed PostgreSQL
 
 Do not keep SQLite locally while using PostgreSQL only in production. Prisma migration SQL is provider-specific, so the existing SQLite migration history cannot also manage PostgreSQL.
 
-This is particularly important because the repository currently contains several SQLite-specific components:
+At planning time, the repository contained several SQLite-specific components:
 
-- `schema.prisma` uses `provider = "sqlite"`.
-- Database setup builds a SQLite file using `sql.js`.
-- Test infrastructure requires a `file:` URL and hardcodes `data/test.db`.
-- CI currently runs against a SQLite file.
-- EPG concurrency currently relies on touching a per-channel lock row inside a transaction.
+- `schema.prisma` used `provider = "sqlite"`.
+- Database setup built a SQLite file using `sql.js`.
+- Test infrastructure required a `file:` URL and hardcoded `data/test.db`.
+- CI ran against a SQLite file.
+- EPG concurrency relied only on touching a per-channel lock row inside a transaction.
+
+Those components have been replaced. The archived SQLite migration under
+`prisma/migrations-sqlite/` is retained only as historical evidence.
 
 The assignment explicitly evaluates database integrity and concurrent EPG writes, while the current database design already contains `EpgScheduleLock` for that purpose.
 
@@ -172,6 +181,8 @@ The current schema contains self-referencing content relationships, cascade/rest
 
 # PG-04 - Harden EPG Integrity and Concurrency
 
+**Status:** Complete — PostgreSQL check and exclusion constraints protect EPG integrity, with concurrent-write coverage.
+
 ## Description
 
 Adapt the current EPG transaction to PostgreSQL and add database-level protection against overlapping schedules.
@@ -229,6 +240,8 @@ The `[)` boundary permits one program to start exactly when another ends.
 
 # PG-05 - Replace SQLite-Specific Database Tooling
 
+**Status:** Complete — active setup, migration, reset, seed, and connectivity tooling targets PostgreSQL.
+
 ## Description
 
 Remove scripts and dependencies that construct or manage SQLite files.
@@ -278,11 +291,13 @@ Production and CI should use `prisma migrate deploy`, while `migrate dev` remain
 
 # PG-06 - Move Automated Tests to PostgreSQL
 
+**Status:** Complete — tests use guarded, isolated PostgreSQL databases.
+
 ## Description
 
 Replace the disposable SQLite test database with isolated PostgreSQL test infrastructure.
 
-The existing helper creates and deletes `data/test.db`, validates an exact SQLite path, and clears tables through Prisma.
+The pre-migration helper created and deleted `data/test.db`, validated an exact SQLite path, and cleared tables through Prisma.
 
 Tests should instead use a dedicated PostgreSQL database or isolated schema. Cleanup must never target development or production databases.
 
@@ -315,6 +330,8 @@ Tests should instead use a dedicated PostgreSQL database or isolated schema. Cle
 ---
 
 # PG-07 - Run PostgreSQL in GitHub Actions
+
+**Status:** Complete — CI runs migrations and the quality gate against PostgreSQL 18.
 
 ## Description
 
@@ -354,11 +371,13 @@ The updated workflow should launch a PostgreSQL service container, wait for it t
 
 # PG-08 - Cut Over Deployment and Update Documentation
 
+**Status:** Complete — deployment uses managed PostgreSQL and the active operational documentation reflects the cutover.
+
 ## Description
 
 Provision managed PostgreSQL for the shared deployment, apply migrations, initialize sample data, verify the service, and remove SQLite deployment assumptions.
 
-The README currently describes SQLite commands and a disposable SQLite test database. These instructions and the database architecture document must be updated.
+At planning time, the README described SQLite commands and a disposable SQLite test database. The README and database architecture guide were updated during the cutover.
 
 ## Acceptance Criteria
 

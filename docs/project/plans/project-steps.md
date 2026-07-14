@@ -1,6 +1,6 @@
 # SaatCMS Assignment - User Story Project Plan
 
-Historical note: this document records the original implementation plan and step-by-step delivery notes for the assignment. For current post-release work, see [post-release-fixes.md](post-release-fixes.md). For the current repository status, use the README and domain/API docs as the source of truth.
+Historical note: this document records the original implementation plan and step-by-step delivery notes for the assignment. Its original SQLite choice was superseded by the completed PostgreSQL migration. For the current repository status, use the README and domain/API docs as the source of truth; [post-release-fixes.md](post-release-fixes.md) is also a completed historical plan.
 
 Source: SaatCMS Backend Developer Take-Home Assignment.
 
@@ -67,7 +67,7 @@ After the stack is selected, initialize the project structure and prepare the ba
 | -------------------- | --------------------------- | ------------------------------------------------------------------- |
 | Programming language | TypeScript                  | Strong typing, familiar ecosystem, faster development               |
 | Backend framework    | Hono                        | Lightweight, simple routing, good for clean API implementation      |
-| Database             | SQLite                      | Lightweight, easy local setup, no external database required        |
+| Database             | SQLite (original choice)    | Superseded by PostgreSQL 18; see the current README and database guide |
 | ORM / data access    | Prisma                      | Clear schema modeling, migrations, seed support, type-safe queries  |
 | Testing framework    | Vitest                      | Fast, TypeScript-friendly, simple setup                             |
 | API testing          | cURL examples + docs folder | Easy for reviewer to run without importing tools                    |

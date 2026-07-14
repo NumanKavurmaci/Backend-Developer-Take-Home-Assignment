@@ -4,7 +4,7 @@
 
 Provide authenticated CMS APIs that can create, read, update, and delete the supported business entities without bypassing content hierarchy, metadata inheritance, EPG scheduling, or database integrity rules.
 
-This is not a generic database-table editor. CRUD operations will be implemented as explicit domain APIs for:
+This is not a generic database-table editor. CRUD operations are implemented as explicit domain APIs for:
 
 - Content: Series, Season, Episode, and Movie
 - Live channels
@@ -15,7 +15,7 @@ This is not a generic database-table editor. CRUD operations will be implemented
 
 ## Implementation Status
 
-**Complete on `feature/crud-operations`.** The domain APIs, authentication and
+**Complete.** The domain APIs, authentication and
 roles, structured audit events, rate/body limits, optimistic concurrency,
 rollback switch, automated tests, OpenAPI contract, and Postman requests are
 implemented. Deployment still requires real CMS keys through the platform
