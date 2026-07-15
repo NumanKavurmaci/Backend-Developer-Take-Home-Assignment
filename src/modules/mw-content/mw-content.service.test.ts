@@ -63,7 +63,7 @@ describe("middleware content service", () => {
     });
 
     const response = await new MwContentService().getResolvedContent(
-      "episode-public-service",
+      "  episode-public-service  ",
     );
 
     expect(response).toEqual({

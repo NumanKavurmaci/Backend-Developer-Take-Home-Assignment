@@ -9,7 +9,7 @@ import {
   VIDEO_QUALITIES,
   type ResolvedContentMetadata,
 } from "../../shared/domain/domain-contracts.js";
-import { ApiError } from "../../shared/http/api-error.js";
+import { readContentId } from "../../shared/http/content-id.js";
 import type { PlaybackRequestHeaders } from "./playback-request-headers.js";
 
 type PlaybackContentResolver = (
@@ -35,7 +35,7 @@ export class MwPlaybackService {
     contentId: string | undefined,
     requestContext: PlaybackRequestHeaders,
   ): Promise<PlaybackResponse> {
-    const normalizedContentId = this.normalizeContentId(contentId);
+    const normalizedContentId = readContentId(contentId);
     const metadata = await this.resolvePlaybackMetadata(normalizedContentId);
     this.assertUserCountryAllowed(requestContext, metadata);
     this.assertDeviceSupported(requestContext, metadata);
@@ -52,16 +52,6 @@ export class MwPlaybackService {
 
   private async resolvePlaybackMetadata(contentId: string) {
     return this.contentResolver(contentId);
-  }
-
-  private normalizeContentId(contentId: string | undefined): string {
-    const normalizedContentId = contentId?.trim();
-
-    if (!normalizedContentId) {
-      throw new ApiError(400, "INVALID_REQUEST", "contentId is required");
-    }
-
-    return normalizedContentId;
   }
 
   private assertUserCountryAllowed(

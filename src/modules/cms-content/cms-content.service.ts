@@ -21,6 +21,7 @@ import {
   type VideoQuality,
 } from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
+import { readContentId } from "../../shared/http/content-id.js";
 import {
   createUpdatedAtEntityTag,
   readOptionalUpdatedAtEntityTag,
@@ -191,14 +192,6 @@ function buildUpdateInput(body: unknown): ContentUpdateInput {
       "geoBlockCountries",
     ),
   };
-}
-
-function readContentId(value: string | undefined): string {
-  if (!value || value.trim() === "") {
-    throw new ApiError(400, "INVALID_REQUEST", "contentId is required");
-  }
-
-  return value;
 }
 
 function readRequestBodyObject(body: unknown): UnknownRecord {

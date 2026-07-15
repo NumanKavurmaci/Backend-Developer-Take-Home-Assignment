@@ -2,7 +2,7 @@ import { prisma } from "../../db/client.js";
 import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
 import { toResolvedContentView } from "../../content/resolved-content-view.js";
 import type { ResolvedContentMetadata } from "../../shared/domain/domain-contracts.js";
-import { ApiError } from "../../shared/http/api-error.js";
+import { readContentId } from "../../shared/http/content-id.js";
 
 export type PublicContentResponse = Omit<
   ResolvedContentMetadata,
@@ -13,11 +13,10 @@ export class MwContentService {
   async getResolvedContent(
     contentId: string | undefined,
   ): Promise<PublicContentResponse> {
-    if (!contentId || contentId.trim() === "") {
-      throw new ApiError(400, "INVALID_REQUEST", "contentId is required");
-    }
-
-    const metadata = await resolveContentMetadata(prisma, contentId);
+    const metadata = await resolveContentMetadata(
+      prisma,
+      readContentId(contentId),
+    );
 
     return toPublicContentResponse(metadata);
   }
