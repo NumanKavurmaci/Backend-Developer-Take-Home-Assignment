@@ -1,13 +1,7 @@
-export const CONTENT_TYPES = {
-  SERIES: "SERIES",
-  SEASON: "SEASON",
-  EPISODE: "EPISODE",
-  MOVIE: "MOVIE",
-} as const;
-
-export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
-
-export const CONTENT_TYPE_VALUES = Object.values(CONTENT_TYPES);
+import {
+  CONTENT_TYPE_VALUES,
+  type ContentType,
+} from "../shared/domain/domain-contracts.js";
 
 export function isContentType(value: string): value is ContentType {
   return CONTENT_TYPE_VALUES.includes(value as ContentType);

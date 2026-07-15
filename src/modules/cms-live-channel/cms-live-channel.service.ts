@@ -1,4 +1,4 @@
-import type { LiveChannel, PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import {
   createLiveChannel,
@@ -7,8 +7,11 @@ import {
   listLiveChannelsPage,
   updateLiveChannel,
 } from "../../live-channel/live-channel-repository.js";
-import type { LiveChannelPage } from "../../live-channel/live-channel-types.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
+import type {
+  LiveChannelRecord,
+  PaginatedResult,
+} from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
@@ -18,7 +21,7 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
 
-export type LiveChannelListQuery = {
+export type CmsLiveChannelListRequestQuery = {
   name?: string;
   slug?: string;
   page?: string;
@@ -28,7 +31,7 @@ export type LiveChannelListQuery = {
 export class CmsLiveChannelService {
   constructor(private readonly database: PrismaClient = prisma) {}
 
-  async createChannel(body: unknown): Promise<LiveChannel> {
+  async createChannel(body: unknown): Promise<LiveChannelRecord> {
     const requestBody = readRequestBodyObject(body);
     assertOnlyKnownFields(requestBody, CREATE_FIELDS);
 
@@ -38,7 +41,9 @@ export class CmsLiveChannelService {
     });
   }
 
-  async getChannel(channelId: string | undefined): Promise<LiveChannel> {
+  async getChannel(
+    channelId: string | undefined,
+  ): Promise<LiveChannelRecord> {
     const channel = await getLiveChannelById(
       this.database,
       readChannelId(channelId),
@@ -51,7 +56,9 @@ export class CmsLiveChannelService {
     return channel;
   }
 
-  async listChannels(query: LiveChannelListQuery): Promise<LiveChannelPage> {
+  async listChannels(
+    query: CmsLiveChannelListRequestQuery,
+  ): Promise<PaginatedResult<LiveChannelRecord>> {
     const page = readPositiveInteger(query.page, "page", DEFAULT_PAGE);
     const pageSize = readPositiveInteger(
       query.pageSize,
@@ -79,7 +86,7 @@ export class CmsLiveChannelService {
     channelId: string | undefined,
     body: unknown,
     ifMatch?: string,
-  ): Promise<LiveChannel> {
+  ): Promise<LiveChannelRecord> {
     const id = readChannelId(channelId);
     const requestBody = readRequestBodyObject(body);
     assertOnlyKnownFields(requestBody, UPDATE_FIELDS);

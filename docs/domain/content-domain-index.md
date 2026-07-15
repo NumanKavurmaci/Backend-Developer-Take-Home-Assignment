@@ -14,15 +14,19 @@ src/content/
   content-repository.ts
   content-types.ts
   metadata-inheritance.ts
+
+src/shared/domain/
+  domain-contracts.ts
 ```
 
 ## High-Level Responsibilities
 
 | File                        | Responsibility                                                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `content-types.ts`          | Defines allowed content type constants and type guards.                                                                            |
+| `shared/domain/domain-contracts.ts` | Defines all domain constants and content, live-channel, EPG, and pagination contracts in one place.                       |
+| `content-types.ts`          | Defines content type guards and assertions.                                                                                         |
 | `content-hierarchy.ts`      | Defines valid parent-child hierarchy rules and validates parent relationships.                                                     |
-| `content-metadata.ts`       | Defines inheritable metadata fields, playback metadata fields, video quality values, and video quality validation.                 |
+| `content-metadata.ts`       | Defines video quality guards and assertions.                                                                                        |
 | `content-repository.ts`     | Handles Prisma database access for content creation, parent/child lookup, ancestor traversal, and geo-block country normalization. |
 | `metadata-inheritance.ts`   | Resolves final middleware metadata by walking the ancestor path and applying inheritance rules.                                    |
 | `content-hierarchy.test.ts` | Tests hierarchy validation behavior.                                                                                               |
@@ -33,9 +37,11 @@ src/content/
 
 ## Purpose
 
-Defines the supported CMS content types and helper functions for validating them.
+Defines helper functions for validating the supported CMS content types. The
+canonical constants and `ContentType` union live in
+`src/shared/domain/domain-contracts.ts`.
 
-## Exports
+## Contracts exported by `domain-contracts.ts`
 
 ### `CONTENT_TYPES`
 
@@ -65,7 +71,9 @@ Supported values:
 export type ContentType = (typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES];
 ```
 
-Union type of all allowed content type values.
+Union type of all allowed content type values. It is exported from
+`src/shared/domain/domain-contracts.ts`; `content-types.ts` owns only runtime
+validation helpers.
 
 Equivalent to:
 
@@ -82,6 +90,8 @@ export const CONTENT_TYPE_VALUES = Object.values(CONTENT_TYPES);
 Array of allowed content type values.
 
 Used by validation helpers.
+
+## Validation helpers exported by `content-types.ts`
 
 ### `isContentType(value)`
 
@@ -132,10 +142,14 @@ Allowed parent rules:
 ## Imports
 
 ```ts
-import { CONTENT_TYPES, type ContentType } from "./content-types.js";
+import {
+  CONTENT_TYPES,
+  type ContentType,
+} from "../shared/domain/domain-contracts.js";
 ```
 
-Uses the canonical content type constants from `content-types.ts`.
+Uses the canonical content type constants from
+`src/shared/domain/domain-contracts.ts`.
 
 ## Exports
 
@@ -201,9 +215,11 @@ Used in:
 
 ## Purpose
 
-Defines the metadata fields that can be inherited and validates metadata-related values, especially video quality.
+Validates metadata-related values, especially video quality. Canonical metadata
+field lists, video quality constants, and the `VideoQuality` union live in
+`src/shared/domain/domain-contracts.ts`.
 
-## Exports
+## Contracts exported by `domain-contracts.ts`
 
 ### `INHERITABLE_METADATA_FIELDS`
 
@@ -226,15 +242,6 @@ For an episode, inheritance priority is:
 Episode -> Season -> Series
 ```
 
-### `InheritableMetadataField`
-
-```ts
-export type InheritableMetadataField =
-  (typeof INHERITABLE_METADATA_FIELDS)[number];
-```
-
-Union type of inheritable metadata field names.
-
 ### `PLAYBACK_METADATA_FIELDS`
 
 ```ts
@@ -253,14 +260,6 @@ These fields are important for later endpoint:
 ```http
 GET /api/v1/mw/playback/{contentId}
 ```
-
-### `PlaybackMetadataField`
-
-```ts
-export type PlaybackMetadataField = (typeof PLAYBACK_METADATA_FIELDS)[number];
-```
-
-Union type of playback metadata field names.
 
 ### `VIDEO_QUALITIES`
 
@@ -283,6 +282,8 @@ export type VideoQuality =
 
 Union type of allowed video quality values.
 
+This type is exported from `src/shared/domain/domain-contracts.ts`.
+
 Equivalent to:
 
 ```ts
@@ -298,6 +299,8 @@ export const VIDEO_QUALITY_VALUES = Object.values(VIDEO_QUALITIES);
 Array of allowed video quality values.
 
 Used by validation helpers.
+
+## Validation helpers exported by `content-metadata.ts`
 
 ### `DomainError`
 
@@ -361,18 +364,26 @@ Responsibilities:
 
 ```ts
 import type { Content, Prisma, PrismaClient } from "@prisma/client";
-import { assertContentType, type ContentType } from "./content-types.js";
-import { assertVideoQuality, type VideoQuality } from "./content-metadata.js";
+import { assertContentType } from "./content-types.js";
+import { assertVideoQuality } from "./content-metadata.js";
+import type {
+  ContentCreateInput,
+  ContentRecord,
+  ContentUpdateInput,
+} from "../shared/domain/domain-contracts.js";
 import { validateContentParent } from "./content-hierarchy.js";
 ```
 
-## Exported Types
+## Shared Domain Contracts
 
-### `CreateContentInput`
+These contracts are exported by `src/shared/domain/domain-contracts.ts`, not
+by the repository implementation.
+
+### `ContentCreateInput`
 
 ```ts
-export type CreateContentInput = {
-  id: string;
+export interface ContentCreateInput {
+  id?: string;
   type: ContentType;
   title: string;
   parentId?: string | null;
@@ -383,10 +394,11 @@ export type CreateContentInput = {
   playbackUrl?: string | null;
   geoBlockCountriesOverride?: boolean;
   geoBlockCountries?: string[];
-};
+}
 ```
 
-Input shape for creating content rows.
+The explicit declaration keeps the accepted create fields and their optionality
+easy to scan. `ContentUpdateInput` follows the same style for mutable fields.
 
 Important behavior:
 
@@ -395,22 +407,33 @@ Important behavior:
 - `geoBlockCountriesOverride` controls geo-block inheritance.
 - `geoBlockCountries` can only be provided when `geoBlockCountriesOverride` is `true`.
 
-### `ContentWithChildren`
+### `ContentRecord`
+
+Explicit persistence-independent CMS read contract. The repository uses an
+explicit Prisma `select` and field-by-field mapping, so adding a database column
+cannot silently add it to API responses.
+
+### Repository relation payloads
+
+Prisma-specific relation shapes stay local to `content-repository.ts` rather
+than leaking into the shared domain contract layer.
+
+#### `ContentWithChildren`
 
 ```ts
-export type ContentWithChildren = Content & {
-  children: Content[];
-};
+type ContentWithChildren = Prisma.ContentGetPayload<{
+  include: { children: true };
+}>;
 ```
 
 Returned by `getContentWithChildren(...)`.
 
-### `ContentWithParent`
+#### `ContentWithParent`
 
 ```ts
-export type ContentWithParent = Content & {
-  parent: Content | null;
-};
+type ContentWithParent = Prisma.ContentGetPayload<{
+  include: { parent: true };
+}>;
 ```
 
 Returned by `getContentWithParent(...)`.
@@ -477,7 +500,7 @@ Throws `DomainError` with `INVALID_CONTENT_GEO_BLOCK_COUNTRIES` if any code is n
 ```ts
 export async function createContent(
   prisma: PrismaClient,
-  input: CreateContentInput,
+  input: ContentCreateInput,
 ): Promise<Content>;
 ```
 
@@ -680,26 +703,36 @@ Resolved value:
 
 ```ts
 import type { Content, PrismaClient } from "@prisma/client";
-import { assertContentType, type ContentType } from "./content-types.js";
+import { assertContentType } from "./content-types.js";
 import { validateContentParent } from "./content-hierarchy.js";
-import { assertVideoQuality, type VideoQuality } from "./content-metadata.js";
+import { assertVideoQuality } from "./content-metadata.js";
 import { getContentAncestorPath } from "./content-repository.js";
+import type { ResolvedContentMetadata } from
+  "../shared/domain/domain-contracts.js";
 ```
 
-## Exported Types
+## Shared Domain Contract
 
 ### `ResolvedContentMetadata`
 
 ```ts
-export type ResolvedContentMetadata = ResolvedContentBase & {
+export interface ResolvedContentMetadata {
   contentId: string;
   type: ContentType;
+  title: string;
+  parentalRating: string | null;
+  genre: string | null;
   quality: VideoQuality | null;
+  isPremium: boolean | null;
+  playbackUrl: string | null;
   geoBlockCountries: string[];
-};
+}
 ```
 
 Final resolved metadata returned by the middleware domain logic.
+
+The contract is exported from `src/shared/domain/domain-contracts.ts`; this
+module exports the resolver behavior.
 
 Fields:
 
@@ -1055,26 +1088,28 @@ This prevents accidentally skipping `false`.
 
 | Function/Class/Type                              | File                      | Exported | Purpose                                       |
 | ------------------------------------------------ | ------------------------- | -------- | --------------------------------------------- |
-| `CONTENT_TYPES`                                  | `content-types.ts`        | Yes      | Content type constants.                       |
-| `ContentType`                                    | `content-types.ts`        | Yes      | Union type of content types.                  |
-| `CONTENT_TYPE_VALUES`                            | `content-types.ts`        | Yes      | Array of allowed content types.               |
+| `CONTENT_TYPES`                                  | `shared/domain/domain-contracts.ts` | Yes | Content type constants.                |
+| `ContentType`                                    | `shared/domain/domain-contracts.ts` | Yes | Union type of content types.           |
+| `CONTENT_TYPE_VALUES`                            | `shared/domain/domain-contracts.ts` | Yes | Array of allowed content types.        |
 | `isContentType`                                  | `content-types.ts`        | Yes      | Runtime content type guard.                   |
 | `assertContentType`                              | `content-types.ts`        | Yes      | Throws on invalid content type.               |
 | `DomainError`                                    | `shared/domain/domain-error.ts` | Yes | Shared expected domain error type.            |
 | `getAllowedParentType`                           | `content-hierarchy.ts`    | Yes      | Returns expected parent type.                 |
 | `validateContentParent`                          | `content-hierarchy.ts`    | Yes      | Validates parent-child relationship.          |
-| `INHERITABLE_METADATA_FIELDS`                    | `content-metadata.ts`     | Yes      | Fields that can be inherited.                 |
-| `InheritableMetadataField`                       | `content-metadata.ts`     | Yes      | Union type of inheritable field names.        |
-| `PLAYBACK_METADATA_FIELDS`                       | `content-metadata.ts`     | Yes      | Fields needed by playback checks.             |
-| `PlaybackMetadataField`                          | `content-metadata.ts`     | Yes      | Union type of playback metadata field names.  |
-| `VIDEO_QUALITIES`                                | `content-metadata.ts`     | Yes      | Allowed quality constants.                    |
-| `VideoQuality`                                   | `content-metadata.ts`     | Yes      | Union type of quality values.                 |
-| `VIDEO_QUALITY_VALUES`                           | `content-metadata.ts`     | Yes      | Array of allowed quality values.              |
+| `INHERITABLE_METADATA_FIELDS`                    | `shared/domain/domain-contracts.ts` | Yes | Fields that can be inherited.          |
+| `PLAYBACK_METADATA_FIELDS`                       | `shared/domain/domain-contracts.ts` | Yes | Fields needed by playback checks.      |
+| `VIDEO_QUALITIES`                                | `shared/domain/domain-contracts.ts` | Yes | Allowed quality constants.             |
+| `VideoQuality`                                   | `shared/domain/domain-contracts.ts` | Yes | Union type of quality values.           |
+| `VIDEO_QUALITY_VALUES`                           | `shared/domain/domain-contracts.ts` | Yes | Array of allowed quality values.       |
 | `isVideoQuality`                                 | `content-metadata.ts`     | Yes      | Runtime video quality guard.                  |
 | `assertVideoQuality`                             | `content-metadata.ts`     | Yes      | Throws on invalid non-null quality.           |
-| `CreateContentInput`                             | `content-repository.ts`   | Yes      | Input type for creating content.              |
-| `ContentWithChildren`                            | `content-repository.ts`   | Yes      | Content with direct children.                 |
-| `ContentWithParent`                              | `content-repository.ts`   | Yes      | Content with direct parent.                   |
+| `ContentCreateInput`                             | `shared/domain/domain-contracts.ts` | Yes | Input type for creating content.        |
+| `ContentUpdateInput`                             | `shared/domain/domain-contracts.ts` | Yes | Input type for updating content.        |
+| `ContentListQuery`                               | `shared/domain/domain-contracts.ts` | Yes | Normalized content list query.          |
+| `ContentRecord`                                  | `shared/domain/domain-contracts.ts` | Yes | Validated content read model.           |
+| `ContentWithChildren`                            | `content-repository.ts`   | No       | Repository-local Prisma relation payload.     |
+| `ContentWithParent`                              | `content-repository.ts`   | No       | Repository-local Prisma relation payload.     |
+| `PaginatedResult<Item>`                          | `shared/domain/domain-contracts.ts` | Yes | Shared paginated response shape.        |
 | `MAX_CONTENT_HIERARCHY_DEPTH`                    | `content-repository.ts`   | Yes      | Safety depth limit.                           |
 | `normalizeGeoBlockCountries`                     | `content-repository.ts`   | Yes      | Normalizes and validates country codes.       |
 | `createContent`                                  | `content-repository.ts`   | Yes      | Validates and creates content row.            |
@@ -1083,7 +1118,7 @@ This prevents accidentally skipping `false`.
 | `getContentAncestorPath`                         | `content-repository.ts`   | Yes      | Loads root-to-requested ancestor path.        |
 | `listContentChildren`                            | `content-repository.ts`   | Yes      | Lists direct children by parent ID.           |
 | `contentSelectForHierarchy`                      | `content-repository.ts`   | Yes      | Reusable Prisma select for hierarchy fields.  |
-| `ResolvedContentMetadata`                        | `metadata-inheritance.ts` | Yes      | Final resolved metadata type.                 |
+| `ResolvedContentMetadata`                        | `shared/domain/domain-contracts.ts` | Yes | Final resolved metadata type.           |
 | `resolveContentMetadata`                         | `metadata-inheritance.ts` | Yes      | Main metadata inheritance resolver.           |
 | `resolveFirstDefinedMetadataValue`               | `metadata-inheritance.ts` | No       | Resolves scalar fields from closest ancestor. |
 | `assertAncestorPathMatchesContentHierarchyRules` | `metadata-inheritance.ts` | No       | Validates loaded path before inheritance.     |

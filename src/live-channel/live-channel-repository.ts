@@ -1,30 +1,49 @@
-import type { LiveChannel, Prisma, PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { toLiveChannelDomainError } from "./live-channel-error-mapper.js";
 import {
   prepareLiveChannelCreateInput,
   prepareLiveChannelUpdateInput,
 } from "./live-channel.js";
 import type {
-  CreateLiveChannelInput,
-  LiveChannelListOptions,
-  LiveChannelPage,
-  LiveChannelWithPrograms,
-  LiveChannelWithScheduleLock,
-  UpdateLiveChannelInput,
-} from "./live-channel-types.js";
+  LiveChannelCreateInput,
+  LiveChannelListQuery,
+  LiveChannelRecord,
+  LiveChannelUpdateInput,
+  PaginatedResult,
+} from "../shared/domain/domain-contracts.js";
 import { DomainError } from "../shared/domain/domain-error.js";
 import { nextEntityUpdatedAt } from "../shared/http/entity-tag.js";
 
 type LiveChannelPrismaClient = PrismaClient | Prisma.TransactionClient;
 
+const liveChannelSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.LiveChannelSelect;
+
+type LiveChannelRow = Prisma.LiveChannelGetPayload<{
+  select: typeof liveChannelSelect;
+}>;
+
+type LiveChannelWithPrograms = Prisma.LiveChannelGetPayload<{
+  include: { epgPrograms: true };
+}>;
+
+type LiveChannelWithScheduleLock = Prisma.LiveChannelGetPayload<{
+  include: { scheduleLock: true };
+}>;
+
 export async function createLiveChannel(
   prisma: LiveChannelPrismaClient,
-  input: CreateLiveChannelInput,
-): Promise<LiveChannel> {
+  input: LiveChannelCreateInput,
+): Promise<LiveChannelRecord> {
   const data = prepareLiveChannelCreateInput(input);
 
   try {
-    return await prisma.liveChannel.create({
+    const channel = await prisma.liveChannel.create({
       data: {
         id: data.id,
         name: data.name,
@@ -33,7 +52,10 @@ export async function createLiveChannel(
           create: {},
         },
       },
+      select: liveChannelSelect,
     });
+
+    return toLiveChannelRecord(channel);
   } catch (error) {
     throw toLiveChannelDomainError(error) ?? error;
   }
@@ -42,39 +64,48 @@ export async function createLiveChannel(
 export async function getLiveChannelById(
   prisma: PrismaClient,
   channelId: string,
-): Promise<LiveChannel | null> {
-  return prisma.liveChannel.findUnique({
+): Promise<LiveChannelRecord | null> {
+  const channel = await prisma.liveChannel.findUnique({
     where: {
       id: channelId,
     },
+    select: liveChannelSelect,
   });
+
+  return channel ? toLiveChannelRecord(channel) : null;
 }
 
 export async function getLiveChannelBySlug(
   prisma: PrismaClient,
   slug: string,
-): Promise<LiveChannel | null> {
-  return prisma.liveChannel.findUnique({
+): Promise<LiveChannelRecord | null> {
+  const channel = await prisma.liveChannel.findUnique({
     where: {
       slug: slug.trim().toLowerCase(),
     },
+    select: liveChannelSelect,
   });
+
+  return channel ? toLiveChannelRecord(channel) : null;
 }
 
 export async function listLiveChannels(
   prisma: PrismaClient,
-): Promise<LiveChannel[]> {
-  return prisma.liveChannel.findMany({
+): Promise<LiveChannelRecord[]> {
+  const channels = await prisma.liveChannel.findMany({
     orderBy: {
       name: "asc",
     },
+    select: liveChannelSelect,
   });
+
+  return channels.map(toLiveChannelRecord);
 }
 
 export async function listLiveChannelsPage(
   prisma: PrismaClient,
-  options: LiveChannelListOptions,
-): Promise<LiveChannelPage> {
+  options: LiveChannelListQuery,
+): Promise<PaginatedResult<LiveChannelRecord>> {
   const where: Prisma.LiveChannelWhereInput = {
     ...(options.name
       ? { name: { contains: options.name, mode: "insensitive" } }
@@ -84,18 +115,19 @@ export async function listLiveChannelsPage(
       : {}),
   };
   const skip = (options.page - 1) * options.pageSize;
-  const [items, total] = await prisma.$transaction([
+  const [channels, total] = await prisma.$transaction([
     prisma.liveChannel.findMany({
       where,
       orderBy: [{ name: "asc" }, { id: "asc" }],
       skip,
       take: options.pageSize,
+      select: liveChannelSelect,
     }),
     prisma.liveChannel.count({ where }),
   ]);
 
   return {
-    items,
+    items: channels.map(toLiveChannelRecord),
     page: options.page,
     pageSize: options.pageSize,
     total,
@@ -105,15 +137,16 @@ export async function listLiveChannelsPage(
 export async function updateLiveChannel(
   prisma: PrismaClient,
   channelId: string,
-  input: UpdateLiveChannelInput,
+  input: LiveChannelUpdateInput,
   expectedUpdatedAt?: Date,
-): Promise<LiveChannel> {
+): Promise<LiveChannelRecord> {
   const data = prepareLiveChannelUpdateInput(input);
 
   try {
     return await prisma.$transaction(async (transaction) => {
       const current = await transaction.liveChannel.findUnique({
         where: { id: channelId },
+        select: liveChannelSelect,
       });
 
       if (!current) {
@@ -140,13 +173,14 @@ export async function updateLiveChannel(
 
       const updated = await transaction.liveChannel.findUnique({
         where: { id: channelId },
+        select: liveChannelSelect,
       });
 
       if (!updated) {
         throw new DomainError("CHANNEL_NOT_FOUND", "Channel not found");
       }
 
-      return updated;
+      return toLiveChannelRecord(updated);
     });
   } catch (error) {
     if (error instanceof DomainError) {
@@ -200,4 +234,14 @@ export async function getLiveChannelWithScheduleLock(
       scheduleLock: true,
     },
   });
+}
+
+function toLiveChannelRecord(channel: LiveChannelRow): LiveChannelRecord {
+  return {
+    id: channel.id,
+    name: channel.name,
+    slug: channel.slug,
+    createdAt: channel.createdAt,
+    updatedAt: channel.updatedAt,
+  };
 }

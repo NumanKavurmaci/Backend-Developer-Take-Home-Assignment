@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { CONTENT_TYPES } from "../../content/content-types.js";
-import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
-import { type ResolvedContentMetadata } from "../../content/metadata-inheritance.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
+import {
+  CONTENT_TYPES,
+  VIDEO_QUALITIES,
+  type ResolvedContentMetadata,
+} from "../../shared/domain/domain-contracts.js";
 import {
   errorHandler,
   notFoundHandler,

@@ -3,20 +3,22 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearContentTables } from "../test/test-database.js";
 import {
   assertContentType,
-  CONTENT_TYPE_VALUES,
-  CONTENT_TYPES,
   isContentType,
 } from "./content-types.js";
 import { DomainError } from "../shared/domain/domain-error.js";
 import { getAllowedParentType } from "./content-hierarchy.js";
 import {
+  assertVideoQuality,
+  isVideoQuality,
+} from "./content-metadata.js";
+import {
+  CONTENT_TYPE_VALUES,
+  CONTENT_TYPES,
   INHERITABLE_METADATA_FIELDS,
   PLAYBACK_METADATA_FIELDS,
   VIDEO_QUALITIES,
   VIDEO_QUALITY_VALUES,
-  assertVideoQuality,
-  isVideoQuality,
-} from "./content-metadata.js";
+} from "../shared/domain/domain-contracts.js";
 import {
   createContent,
   contentSelectForHierarchy,

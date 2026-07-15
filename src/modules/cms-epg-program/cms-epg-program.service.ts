@@ -11,11 +11,11 @@ import {
   updateEpgProgramWithConcurrencyLock,
 } from "../../live-channel/epg-program/epg-program-repository.js";
 import type {
-  CreateEpgProgramInput,
-  EpgProgramPage,
+  EpgProgramCreateInput,
   EpgProgramRecord,
-  UpdateEpgProgramInput,
-} from "../../live-channel/epg-program/epg-program-types.js";
+  EpgProgramUpdateInput,
+  PaginatedResult,
+} from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import { readOptionalUpdatedAtEntityTag } from "../../shared/http/entity-tag.js";
 
@@ -56,7 +56,7 @@ export class CmsEpgProgramService {
   async listPrograms(
     channelId: string | undefined,
     query: unknown,
-  ): Promise<EpgProgramPage> {
+  ): Promise<PaginatedResult<EpgProgramRecord>> {
     const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
     const requestQuery = readRequestObject(query, "Query parameters");
     assertAllowedFields(requestQuery, LIST_FIELDS);
@@ -99,7 +99,7 @@ export class CmsEpgProgramService {
       );
     }
 
-    const input: UpdateEpgProgramInput = {
+    const input: EpgProgramUpdateInput = {
       ...(hasOwn(requestBody, "programName")
         ? {
             programName: readRequiredString(
@@ -116,7 +116,6 @@ export class CmsEpgProgramService {
       ...(hasOwn(requestBody, "endTime")
         ? { endTime: readRequiredDate(requestBody.endTime, "endTime") }
         : {}),
-      expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
     };
 
     return updateEpgProgramWithConcurrencyLock(
@@ -124,6 +123,7 @@ export class CmsEpgProgramService {
       readRequiredRouteId(channelId, "channelId"),
       readRequiredRouteId(programId, "programId"),
       input,
+      readOptionalUpdatedAtEntityTag(ifMatch),
     );
   }
 
@@ -142,7 +142,7 @@ export class CmsEpgProgramService {
 function buildCreateInput(
   channelId: string | undefined,
   body: unknown,
-): CreateEpgProgramInput {
+): EpgProgramCreateInput {
   const normalizedChannelId = readRequiredRouteId(channelId, "channelId");
   const requestBody = readRequestObject(body, "Request body");
   assertAllowedFields(requestBody, CREATE_FIELDS);

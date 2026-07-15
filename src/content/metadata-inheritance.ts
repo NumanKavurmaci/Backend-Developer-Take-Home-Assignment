@@ -1,21 +1,13 @@
 import type { Content, PrismaClient } from "@prisma/client";
-import { assertContentType, type ContentType } from "./content-types.js";
+import { assertContentType } from "./content-types.js";
 import { validateContentParent } from "./content-hierarchy.js";
-import { assertVideoQuality, type VideoQuality } from "./content-metadata.js";
+import { assertVideoQuality } from "./content-metadata.js";
 import { getContentAncestorPath } from "./content-repository.js";
 import { DomainError } from "../shared/domain/domain-error.js";
-
-type ResolvedContentBase = Pick<
-  Content,
-  "title" | "parentalRating" | "genre" | "isPremium" | "playbackUrl"
->;
-
-export type ResolvedContentMetadata = ResolvedContentBase & {
-  contentId: string;
-  type: ContentType;
-  quality: VideoQuality | null;
-  geoBlockCountries: string[];
-};
+import type {
+  ContentType,
+  ResolvedContentMetadata,
+} from "../shared/domain/domain-contracts.js";
 
 // Resolves final metadata from closest content first: Episode -> Season -> Series.
 export async function resolveContentMetadata(

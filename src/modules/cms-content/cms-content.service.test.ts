@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { CONTENT_TYPES } from "../../content/content-types.js";
+import { CONTENT_TYPES } from "../../shared/domain/domain-contracts.js";
 import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
 import { clearContentTables } from "../../test/test-database.js";
 import {

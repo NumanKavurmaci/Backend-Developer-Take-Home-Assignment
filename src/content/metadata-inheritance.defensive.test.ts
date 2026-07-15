@@ -1,6 +1,6 @@
 import type { Content, PrismaClient } from "@prisma/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CONTENT_TYPES } from "./content-types.js";
+import { CONTENT_TYPES } from "../shared/domain/domain-contracts.js";
 
 const now = new Date("2026-07-02T12:00:00.000Z");
 

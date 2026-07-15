@@ -6,22 +6,20 @@ import {
   getCmsContent,
   listCmsContent,
   updateCmsContent,
-  type CmsContentRecord,
-  type CreateContentInput,
-  type ListCmsContentResult,
-  type UpdateCmsContentInput,
 } from "../../content/content-repository.js";
+import { isContentType } from "../../content/content-types.js";
+import { isVideoQuality } from "../../content/content-metadata.js";
+import { DomainError } from "../../shared/domain/domain-error.js";
 import {
   CONTENT_TYPE_VALUES,
-  isContentType,
-  type ContentType,
-} from "../../content/content-types.js";
-import {
   VIDEO_QUALITY_VALUES,
-  isVideoQuality,
+  type ContentCreateInput,
+  type ContentRecord,
+  type ContentType,
+  type ContentUpdateInput,
+  type PaginatedResult,
   type VideoQuality,
-} from "../../content/content-metadata.js";
-import { DomainError } from "../../shared/domain/domain-error.js";
+} from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 import {
   createUpdatedAtEntityTag,
@@ -58,13 +56,13 @@ type UnknownRecord = Record<string, unknown>;
 export class CmsContentService {
   constructor(private readonly database: PrismaClient = prisma) {}
 
-  async createContent(body: unknown): Promise<CmsContentRecord> {
+  async createContent(body: unknown): Promise<ContentRecord> {
     const input = buildCreateInput(body);
 
     return this.runMutation(() => createCmsContent(this.database, input));
   }
 
-  async getContent(contentId: string | undefined): Promise<CmsContentRecord> {
+  async getContent(contentId: string | undefined): Promise<ContentRecord> {
     const id = readContentId(contentId);
     const content = await getCmsContent(this.database, id);
 
@@ -77,7 +75,7 @@ export class CmsContentService {
 
   async listContent(
     query: Record<string, string | undefined>,
-  ): Promise<ListCmsContentResult> {
+  ): Promise<PaginatedResult<ContentRecord>> {
     assertAllowedFields(query, LIST_FIELDS);
 
     return listCmsContent(this.database, {
@@ -98,11 +96,14 @@ export class CmsContentService {
     contentId: string | undefined,
     body: unknown,
     ifMatch?: string,
-  ): Promise<CmsContentRecord> {
+  ): Promise<ContentRecord> {
     const id = readContentId(contentId);
-    const input = buildUpdateInput(body, ifMatch);
+    const input = buildUpdateInput(body);
+    const expectedUpdatedAt = readOptionalUpdatedAtEntityTag(ifMatch);
 
-    return this.runMutation(() => updateCmsContent(this.database, id, input));
+    return this.runMutation(() =>
+      updateCmsContent(this.database, id, input, expectedUpdatedAt),
+    );
   }
 
   async deleteContent(contentId: string | undefined): Promise<void> {
@@ -128,7 +129,7 @@ export function createContentEtag(updatedAt: Date): string {
   return createUpdatedAtEntityTag(updatedAt);
 }
 
-function buildCreateInput(body: unknown): CreateContentInput {
+function buildCreateInput(body: unknown): ContentCreateInput {
   const requestBody = readRequestBodyObject(body);
   assertAllowedFields(requestBody, CREATE_FIELDS);
 
@@ -152,10 +153,7 @@ function buildCreateInput(body: unknown): CreateContentInput {
   };
 }
 
-function buildUpdateInput(
-  body: unknown,
-  ifMatch: string | undefined,
-): UpdateCmsContentInput {
+function buildUpdateInput(body: unknown): ContentUpdateInput {
   const requestBody = readRequestBodyObject(body);
 
   if (Object.keys(requestBody).length === 0) {
@@ -192,7 +190,6 @@ function buildUpdateInput(
       requestBody,
       "geoBlockCountries",
     ),
-    expectedUpdatedAt: readOptionalUpdatedAtEntityTag(ifMatch),
   };
 }
 

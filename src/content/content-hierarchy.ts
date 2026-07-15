@@ -1,4 +1,7 @@
-import { CONTENT_TYPES, type ContentType } from "./content-types.js";
+import {
+  CONTENT_TYPES,
+  type ContentType,
+} from "../shared/domain/domain-contracts.js";
 import { DomainError } from "../shared/domain/domain-error.js";
 
 const allowedParentByType: Record<ContentType, ContentType | null> = {

@@ -2,8 +2,10 @@ import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { errorHandler, notFoundHandler } from "../../shared/http/error-handler.js";
 import { ApiError } from "../../shared/http/api-error.js";
-import { CONTENT_TYPES } from "../../content/content-types.js";
-import { VIDEO_QUALITIES } from "../../content/content-metadata.js";
+import {
+  CONTENT_TYPES,
+  VIDEO_QUALITIES,
+} from "../../shared/domain/domain-contracts.js";
 import { MwContentController } from "./mw-content.controller.js";
 import { createMwContentRoutes } from "./mw-content.route.js";
 import {

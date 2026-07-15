@@ -1,8 +1,8 @@
 import { DomainError } from "../shared/domain/domain-error.js";
 import type {
-  CreateLiveChannelInput,
-  UpdateLiveChannelInput,
-} from "./live-channel-types.js";
+  LiveChannelCreateInput,
+  LiveChannelUpdateInput,
+} from "../shared/domain/domain-contracts.js";
 
 const LIVE_CHANNEL_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -15,7 +15,7 @@ export function normalizeLiveChannelSlug(slug: string): string {
 }
 
 export function assertValidLiveChannelInput(
-  input: CreateLiveChannelInput,
+  input: LiveChannelCreateInput,
 ): void {
   const name = normalizeLiveChannelName(input.name);
   const slug = normalizeLiveChannelSlug(input.slug);
@@ -43,8 +43,8 @@ export function assertValidLiveChannelInput(
 }
 
 export function prepareLiveChannelCreateInput(
-  input: CreateLiveChannelInput,
-): CreateLiveChannelInput {
+  input: LiveChannelCreateInput,
+): LiveChannelCreateInput {
   assertValidLiveChannelInput(input);
 
   return {
@@ -55,9 +55,9 @@ export function prepareLiveChannelCreateInput(
 }
 
 export function prepareLiveChannelUpdateInput(
-  input: UpdateLiveChannelInput,
-): UpdateLiveChannelInput {
-  const prepared: UpdateLiveChannelInput = {};
+  input: LiveChannelUpdateInput,
+): LiveChannelUpdateInput {
+  const prepared: LiveChannelUpdateInput = {};
 
   if (input.name !== undefined) {
     const name = normalizeLiveChannelName(input.name);
