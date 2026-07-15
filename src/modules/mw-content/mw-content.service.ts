@@ -1,5 +1,6 @@
 import { prisma } from "../../db/client.js";
 import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
+import { toResolvedContentView } from "../../content/resolved-content-view.js";
 import type { ResolvedContentMetadata } from "../../shared/domain/domain-contracts.js";
 import { ApiError } from "../../shared/http/api-error.js";
 
@@ -27,12 +28,6 @@ export function toPublicContentResponse(
 ): PublicContentResponse {
   return {
     contentId: metadata.contentId,
-    type: metadata.type,
-    title: metadata.title,
-    parentalRating: metadata.parentalRating,
-    genre: metadata.genre,
-    quality: metadata.quality,
-    isPremium: metadata.isPremium,
-    geoBlockCountries: metadata.geoBlockCountries,
+    ...toResolvedContentView(metadata),
   };
 }

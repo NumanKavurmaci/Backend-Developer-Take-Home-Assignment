@@ -1,5 +1,9 @@
 import { prisma } from "../../db/client.js";
 import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
+import {
+  toResolvedContentView,
+  type ResolvedContentView,
+} from "../../content/resolved-content-view.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import {
   VIDEO_QUALITIES,
@@ -12,24 +16,13 @@ type PlaybackContentResolver = (
   contentId: string,
 ) => Promise<ResolvedContentMetadata>;
 
-type PlaybackResponseMetadata = Pick<
-  ResolvedContentMetadata,
-  | "type"
-  | "title"
-  | "parentalRating"
-  | "genre"
-  | "quality"
-  | "isPremium"
-  | "geoBlockCountries"
->;
-
 export type PlaybackResponse = {
   contentId: string;
   requestContext: PlaybackRequestHeaders;
   playback: {
     playbackUrl: string | null;
   };
-  metadata: PlaybackResponseMetadata;
+  metadata: ResolvedContentView;
 };
 
 export class MwPlaybackService {
@@ -53,15 +46,7 @@ export class MwPlaybackService {
       playback: {
         playbackUrl: metadata.playbackUrl,
       },
-      metadata: {
-        type: metadata.type,
-        title: metadata.title,
-        parentalRating: metadata.parentalRating,
-        genre: metadata.genre,
-        quality: metadata.quality,
-        isPremium: metadata.isPremium,
-        geoBlockCountries: metadata.geoBlockCountries,
-      },
+      metadata: toResolvedContentView(metadata),
     };
   }
 
