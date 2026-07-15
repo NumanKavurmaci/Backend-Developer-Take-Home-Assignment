@@ -211,6 +211,31 @@ describe("documentation consistency", () => {
     expect(collection).toContain("Bearer {{cmsEditorKey}}");
     expect(collection).toContain("Bearer {{cmsAdminKey}}");
   });
+
+  it("publishes the public middleware and health contract", async () => {
+    const [openApi, readme] = await Promise.all([
+      readFile(path.join(rootDir, "docs", "api", "mw-openapi.yaml"), "utf8"),
+      readFile(path.join(rootDir, "README.md"), "utf8"),
+    ]);
+
+    for (const route of [
+      "/health:",
+      "/ready:",
+      "/api/v1/mw/content/{contentId}:",
+      "/api/v1/mw/playback/{contentId}:",
+    ]) {
+      expect(openApi).toContain(route);
+    }
+
+    for (const header of ["X-User-Id", "X-User-Country", "X-Device-Type"]) {
+      expect(openApi).toContain(`name: ${header}`);
+    }
+
+    expect(openApi).toContain("playbackUrl:");
+    expect(readme).toContain(
+      "[Middleware OpenAPI contract](docs/api/mw-openapi.yaml)",
+    );
+  });
 });
 
 async function listMarkdownFiles(directory: string): Promise<string[]> {

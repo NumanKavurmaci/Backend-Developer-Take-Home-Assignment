@@ -2,6 +2,9 @@
 
 The middleware content endpoint returns resolved metadata for one content item.
 
+The machine-readable middleware contract is
+[mw-openapi.yaml](mw-openapi.yaml).
+
 ```http
 GET /api/v1/mw/content/{contentId}
 ```
