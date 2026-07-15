@@ -12,6 +12,14 @@ describe("OpenAPI contract delivery", () => {
     expect(body).toContain(
       'urls: [{"name":"Middleware API","url":"/openapi/mw.yaml"},{"name":"CMS CRUD API","url":"/openapi/cms.yaml"}]',
     );
+    expect(body).toContain(
+      'swagger-ui-dist@5.32.8/swagger-ui-standalone-preset.js',
+    );
+    expect(body).toContain(
+      "presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset]",
+    );
+    expect(body).toContain('layout: "StandaloneLayout"');
+    expect(body).toContain('"urls.primaryName": "Middleware API"');
   });
 
   it.each([
