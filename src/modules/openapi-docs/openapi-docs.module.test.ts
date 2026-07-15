@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../../app.js";
 
 describe("OpenAPI contract delivery", () => {
+  it("renders Swagger UI with both contract choices", async () => {
+    const response = await createApp().request("/docs");
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/html");
+    expect(body).toContain("<title>SaatCMS API Documentation</title>");
+    expect(body).toContain(
+      'urls: [{"name":"Middleware API","url":"/openapi/mw.yaml"},{"name":"CMS CRUD API","url":"/openapi/cms.yaml"}]',
+    );
+  });
+
   it.each([
     ["/openapi/mw.yaml", "SaatCMS Middleware API"],
     ["/openapi/cms.yaml", "SaatCMS CRUD API"],
@@ -21,4 +33,3 @@ describe("OpenAPI contract delivery", () => {
     expect(body).toContain("version: 1.0.0");
   });
 });
-
