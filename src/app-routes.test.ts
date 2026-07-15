@@ -5,6 +5,8 @@ const expectedEndpoints = [
   "GET /",
   "GET /health",
   "GET /ready",
+  "GET /openapi/mw.yaml",
+  "GET /openapi/cms.yaml",
   "GET /api/v1/mw/content/:contentId",
   "GET /api/v1/mw/playback/:contentId",
   "POST /api/v1/cms/content",
