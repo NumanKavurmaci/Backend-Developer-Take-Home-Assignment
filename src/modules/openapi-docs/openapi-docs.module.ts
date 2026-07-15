@@ -4,6 +4,12 @@ import { swaggerUI } from "@hono/swagger-ui";
 import type { Context, Hono } from "hono";
 
 const CONTRACT_CACHE_CONTROL = "public, max-age=300";
+const SWAGGER_UI_VERSION = "5.32.8";
+
+const openApiDefinitions = [
+  { name: "Middleware API", url: "/openapi/mw.yaml" },
+  { name: "CMS CRUD API", url: "/openapi/cms.yaml" },
+] as const;
 
 const contractFiles = {
   cms: path.join(process.cwd(), "docs", "api", "cms-crud-openapi.yaml"),
@@ -19,19 +25,51 @@ async function serveContract(c: Context, filePath: string) {
   });
 }
 
+function renderSwaggerUi(assets: { css: string[]; js: string[] }) {
+  const bundleScriptUrl = assets.js.find((url) =>
+    url.endsWith("/swagger-ui-bundle.js"),
+  );
+
+  if (!bundleScriptUrl) {
+    throw new Error("Swagger UI bundle asset is unavailable.");
+  }
+
+  const standalonePresetUrl = bundleScriptUrl.replace(
+    "/swagger-ui-bundle.js",
+    "/swagger-ui-standalone-preset.js",
+  );
+
+  return `
+    <div id="swagger-ui"></div>
+    ${assets.css.map((url) => `<link rel="stylesheet" href="${url}" />`).join("\n")}
+    ${assets.js.map((url) => `<script src="${url}" crossorigin="anonymous"></script>`).join("\n")}
+    <script src="${standalonePresetUrl}" crossorigin="anonymous"></script>
+    <script>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          dom_id: "#swagger-ui",
+          deepLinking: true,
+          displayRequestDuration: true,
+          filter: true,
+          urls: ${JSON.stringify(openApiDefinitions)},
+          "urls.primaryName": "Middleware API",
+          presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+          layout: "StandaloneLayout",
+        })
+      }
+    </script>
+  `;
+}
+
 export class OpenApiDocsModule {
   static register(app: Hono) {
     app.get(
       "/docs",
       swaggerUI({
-        deepLinking: true,
-        displayRequestDuration: true,
-        filter: true,
+        manuallySwaggerUIHtml: renderSwaggerUi,
         title: "SaatCMS API Documentation",
-        urls: [
-          { name: "Middleware API", url: "/openapi/mw.yaml" },
-          { name: "CMS CRUD API", url: "/openapi/cms.yaml" },
-        ],
+        urls: [...openApiDefinitions],
+        version: SWAGGER_UI_VERSION,
       }),
     );
     app.get("/openapi/mw.yaml", (c) =>
