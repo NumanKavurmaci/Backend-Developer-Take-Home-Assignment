@@ -52,4 +52,3 @@ Use small commits so each change can be reviewed independently:
 - Changing API behavior, CMS authorization, or deployment credentials.
 - Opening the pull request; the published feature branch will be reviewed and
   opened separately.
-

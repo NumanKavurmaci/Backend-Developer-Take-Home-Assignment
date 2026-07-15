@@ -4,7 +4,8 @@ info:
   version: 1.0.0
   description: Authenticated domain CRUD for Content, Live Channels, and EPG Programs.
 servers:
-  - url: http://localhost:3000
+  - url: /
+    description: Current server
 security:
   - bearerAuth: []
 tags:

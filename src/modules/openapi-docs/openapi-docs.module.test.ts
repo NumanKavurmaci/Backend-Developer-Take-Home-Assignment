@@ -31,5 +31,6 @@ describe("OpenAPI contract delivery", () => {
     expect(body).toContain("openapi: 3.0.3");
     expect(body).toContain(`title: ${title}`);
     expect(body).toContain("version: 1.0.0");
+    expect(body).toContain("  - url: /");
   });
 });
