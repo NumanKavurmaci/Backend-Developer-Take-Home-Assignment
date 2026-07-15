@@ -2,11 +2,18 @@
 
 The middleware content endpoint returns resolved metadata for one content item.
 
+The machine-readable middleware contract is
+[mw-openapi.yaml](mw-openapi.yaml).
+
 ```http
 GET /api/v1/mw/content/{contentId}
 ```
 
 The endpoint is intentionally read-only. It does not expose raw CMS rows or protected playback asset data; it returns only public metadata that a middleware consumer can inspect before requesting playback.
+
+See [Content Endpoint Roles](content-endpoint-roles.md) for the contract
+boundary between raw CMS records, public resolved metadata, and authorized
+playback responses.
 
 ## Resolution Rules
 

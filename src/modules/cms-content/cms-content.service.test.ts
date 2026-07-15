@@ -34,7 +34,7 @@ describe("CMS content service", () => {
 
     expect(first.id).toBeTruthy();
     expect(first.geoBlockCountries).toEqual(["DE", "TR"]);
-    await expect(service.getContent(first.id)).resolves.toEqual(first);
+    await expect(service.getContent(`  ${first.id}  `)).resolves.toEqual(first);
     await expect(
       service.listContent({
         type: "MOVIE",

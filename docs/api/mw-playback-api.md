@@ -2,11 +2,17 @@
 
 The middleware playback endpoint validates the request context, resolves content metadata, checks geofencing and device restrictions, and returns playback details for allowed content.
 
+The machine-readable middleware contract is
+[mw-openapi.yaml](mw-openapi.yaml).
+
 ```http
 GET /api/v1/mw/playback/{contentId}
 ```
 
 At this stage, the endpoint performs content lookup, blocks geo-restricted requests, blocks unsupported devices for premium 4K content, and returns the resolved playback URL.
+
+See [Content Endpoint Roles](content-endpoint-roles.md) for why playback remains
+separate from public metadata lookup and authenticated CMS content reads.
 
 ## Request
 

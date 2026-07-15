@@ -1,0 +1,237 @@
+openapi: 3.0.3
+info:
+  title: SaatCMS Middleware API
+  version: 1.0.0
+  description: Public health, resolved content metadata, and authorized playback contracts.
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Health
+  - name: Content Metadata
+  - name: Playback
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Check process liveness
+      operationId: getHealth
+      responses:
+        "200":
+          description: Process is running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /ready:
+    get:
+      tags: [Health]
+      summary: Check database readiness
+      operationId: getReadiness
+      responses:
+        "200":
+          description: Service and database are ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "503":
+          description: Database is unreachable or its schema is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessFailure"
+  /api/v1/mw/content/{contentId}:
+    parameters:
+      - $ref: "#/components/parameters/ContentId"
+    get:
+      tags: [Content Metadata]
+      summary: Get resolved public content metadata
+      operationId: getResolvedContent
+      responses:
+        "200":
+          description: Metadata resolved through the content hierarchy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicContent"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+  /api/v1/mw/playback/{contentId}:
+    parameters:
+      - $ref: "#/components/parameters/ContentId"
+      - $ref: "#/components/parameters/UserId"
+      - $ref: "#/components/parameters/UserCountry"
+      - $ref: "#/components/parameters/DeviceType"
+    get:
+      tags: [Playback]
+      summary: Authorize and return content playback
+      operationId: getPlayback
+      responses:
+        "200":
+          description: Playback is allowed for the supplied request context
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        default:
+          $ref: "#/components/responses/ErrorResponse"
+components:
+  parameters:
+    ContentId:
+      name: contentId
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    UserId:
+      name: X-User-Id
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+    UserCountry:
+      name: X-User-Country
+      in: header
+      required: true
+      schema:
+        type: string
+        pattern: "^[A-Za-z]{2}$"
+    DeviceType:
+      name: X-Device-Type
+      in: header
+      required: true
+      schema:
+        type: string
+        enum: [Mobile, SmartTV, Web]
+  responses:
+    ErrorResponse:
+      description: Request failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        service:
+          type: string
+    Readiness:
+      type: object
+      additionalProperties: false
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ready]
+        service:
+          type: string
+    ReadinessFailure:
+      type: object
+      additionalProperties: false
+      required: [status, service, errorCode, message]
+      properties:
+        status:
+          type: string
+          enum: [not_ready]
+        service:
+          type: string
+        errorCode:
+          type: string
+          enum: [DATABASE_NOT_READY]
+        message:
+          type: string
+    ContentType:
+      type: string
+      enum: [SERIES, SEASON, EPISODE, MOVIE]
+    VideoQuality:
+      type: string
+      enum: [SD, HD, UHD_4K]
+      nullable: true
+    ResolvedContentView:
+      type: object
+      required:
+        - type
+        - title
+        - parentalRating
+        - genre
+        - quality
+        - isPremium
+        - geoBlockCountries
+      properties:
+        type:
+          $ref: "#/components/schemas/ContentType"
+        title:
+          type: string
+        parentalRating:
+          type: string
+          nullable: true
+        genre:
+          type: string
+          nullable: true
+        quality:
+          $ref: "#/components/schemas/VideoQuality"
+        isPremium:
+          type: boolean
+          nullable: true
+        geoBlockCountries:
+          type: array
+          items:
+            type: string
+            pattern: "^[A-Z]{2}$"
+    PublicContent:
+      allOf:
+        - $ref: "#/components/schemas/ResolvedContentView"
+        - type: object
+          required: [contentId]
+          properties:
+            contentId:
+              type: string
+    PlaybackRequestContext:
+      type: object
+      additionalProperties: false
+      required: [userId, userCountry, deviceType]
+      properties:
+        userId:
+          type: string
+        userCountry:
+          type: string
+          pattern: "^[A-Z]{2}$"
+        deviceType:
+          type: string
+          enum: [Mobile, SmartTV, Web]
+    PlaybackResponse:
+      type: object
+      additionalProperties: false
+      required: [contentId, requestContext, playback, metadata]
+      properties:
+        contentId:
+          type: string
+        requestContext:
+          $ref: "#/components/schemas/PlaybackRequestContext"
+        playback:
+          type: object
+          additionalProperties: false
+          required: [playbackUrl]
+          properties:
+            playbackUrl:
+              type: string
+              nullable: true
+        metadata:
+          $ref: "#/components/schemas/ResolvedContentView"
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+        message:
+          type: string

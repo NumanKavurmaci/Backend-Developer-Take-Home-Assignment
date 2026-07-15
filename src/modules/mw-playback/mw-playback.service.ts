@@ -1,27 +1,20 @@
 import { prisma } from "../../db/client.js";
 import { resolveContentMetadata } from "../../content/metadata-inheritance.js";
+import {
+  toResolvedContentView,
+  type ResolvedContentView,
+} from "../../content/resolved-content-view.js";
 import { DomainError } from "../../shared/domain/domain-error.js";
 import {
   VIDEO_QUALITIES,
   type ResolvedContentMetadata,
 } from "../../shared/domain/domain-contracts.js";
-import { ApiError } from "../../shared/http/api-error.js";
+import { readContentId } from "../../shared/http/content-id.js";
 import type { PlaybackRequestHeaders } from "./playback-request-headers.js";
 
 type PlaybackContentResolver = (
   contentId: string,
 ) => Promise<ResolvedContentMetadata>;
-
-type PlaybackResponseMetadata = Pick<
-  ResolvedContentMetadata,
-  | "type"
-  | "title"
-  | "parentalRating"
-  | "genre"
-  | "quality"
-  | "isPremium"
-  | "geoBlockCountries"
->;
 
 export type PlaybackResponse = {
   contentId: string;
@@ -29,7 +22,7 @@ export type PlaybackResponse = {
   playback: {
     playbackUrl: string | null;
   };
-  metadata: PlaybackResponseMetadata;
+  metadata: ResolvedContentView;
 };
 
 export class MwPlaybackService {
@@ -42,7 +35,7 @@ export class MwPlaybackService {
     contentId: string | undefined,
     requestContext: PlaybackRequestHeaders,
   ): Promise<PlaybackResponse> {
-    const normalizedContentId = this.normalizeContentId(contentId);
+    const normalizedContentId = readContentId(contentId);
     const metadata = await this.resolvePlaybackMetadata(normalizedContentId);
     this.assertUserCountryAllowed(requestContext, metadata);
     this.assertDeviceSupported(requestContext, metadata);
@@ -53,30 +46,12 @@ export class MwPlaybackService {
       playback: {
         playbackUrl: metadata.playbackUrl,
       },
-      metadata: {
-        type: metadata.type,
-        title: metadata.title,
-        parentalRating: metadata.parentalRating,
-        genre: metadata.genre,
-        quality: metadata.quality,
-        isPremium: metadata.isPremium,
-        geoBlockCountries: metadata.geoBlockCountries,
-      },
+      metadata: toResolvedContentView(metadata),
     };
   }
 
   private async resolvePlaybackMetadata(contentId: string) {
     return this.contentResolver(contentId);
-  }
-
-  private normalizeContentId(contentId: string | undefined): string {
-    const normalizedContentId = contentId?.trim();
-
-    if (!normalizedContentId) {
-      throw new ApiError(400, "INVALID_REQUEST", "contentId is required");
-    }
-
-    return normalizedContentId;
   }
 
   private assertUserCountryAllowed(

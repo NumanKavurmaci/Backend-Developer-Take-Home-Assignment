@@ -68,7 +68,8 @@ pagination, error responses, and concurrency behavior.
 ## Documentation
 
 - [CMS CRUD API](docs/api/cms-crud-api.md)
-- [OpenAPI contract](docs/api/cms-crud-openapi.yaml)
+- [CMS OpenAPI contract](docs/api/cms-crud-openapi.yaml)
+- [Middleware OpenAPI contract](docs/api/mw-openapi.yaml)
 - [API examples and failure cases](docs/api/api-test-examples.md)
 - [Postman collection](docs/api/saatcms-api-tests.postman_collection.json)
 - [Content metadata API](docs/api/content-metadata-api.md)
