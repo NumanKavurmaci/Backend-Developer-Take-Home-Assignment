@@ -36,12 +36,20 @@ Copy-Item .env.example .env
 
 The API starts at `http://localhost:3000`.
 
+Interactive API documentation is available locally at
+[`http://localhost:3000/docs`](http://localhost:3000/docs) and on the deployed
+demo at
+[`https://backend-developer-take-home-assignment.onrender.com/docs`](https://backend-developer-take-home-assignment.onrender.com/docs).
+
 ## API Overview
 
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /health` | Liveness check |
 | `GET /ready` | Database readiness check |
+| `GET /docs` | Interactive Swagger UI for both API contracts |
+| `GET /openapi/mw.yaml` | Middleware OpenAPI contract |
+| `GET /openapi/cms.yaml` | CMS OpenAPI contract |
 | `GET /api/v1/mw/content/{contentId}` | Resolve inherited content metadata |
 | `GET /api/v1/mw/playback/{contentId}` | Authorize and return playback data |
 | `/api/v1/cms/content` | Content CRUD |
@@ -67,6 +75,7 @@ pagination, error responses, and concurrency behavior.
 
 ## Documentation
 
+- [Interactive API documentation](https://backend-developer-take-home-assignment.onrender.com/docs)
 - [CMS CRUD API](docs/api/cms-crud-api.md)
 - [CMS OpenAPI contract](docs/api/cms-crud-openapi.yaml)
 - [Middleware OpenAPI contract](docs/api/mw-openapi.yaml)

@@ -4,7 +4,8 @@ info:
   version: 1.0.0
   description: Public health, resolved content metadata, and authorized playback contracts.
 servers:
-  - url: http://localhost:3000
+  - url: /
+    description: Current server
 tags:
   - name: Health
   - name: Content Metadata

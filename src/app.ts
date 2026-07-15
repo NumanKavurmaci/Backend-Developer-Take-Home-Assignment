@@ -13,6 +13,7 @@ import { CmsContentModule } from "./modules/cms-content/cms-content.module.js";
 import { CmsLiveChannelModule } from "./modules/cms-live-channel/cms-live-channel.module.js";
 import { MwContentModule } from "./modules/mw-content/mw-content.module.js";
 import { MwPlaybackModule } from "./modules/mw-playback/mw-playback.module.js";
+import { OpenApiDocsModule } from "./modules/openapi-docs/openapi-docs.module.js";
 
 export type CreateAppOptions = {
   cmsSecurity?: CmsSecurityOptions;
@@ -38,6 +39,7 @@ export function createApp(options: CreateAppOptions = {}) {
   );
 
   HealthModule.register(app);
+  OpenApiDocsModule.register(app);
   MwContentModule.register(app);
   CmsContentModule.register(app);
   CmsLiveChannelModule.register(app);
