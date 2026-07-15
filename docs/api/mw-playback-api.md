@@ -8,6 +8,9 @@ GET /api/v1/mw/playback/{contentId}
 
 At this stage, the endpoint performs content lookup, blocks geo-restricted requests, blocks unsupported devices for premium 4K content, and returns the resolved playback URL.
 
+See [Content Endpoint Roles](content-endpoint-roles.md) for why playback remains
+separate from public metadata lookup and authenticated CMS content reads.
+
 ## Request
 
 Path parameters:

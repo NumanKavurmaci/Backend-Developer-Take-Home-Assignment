@@ -57,6 +57,10 @@ return `400`.
 
 ## Content
 
+CMS content responses are raw editing records rather than resolved middleware
+views. See [Content Endpoint Roles](content-endpoint-roles.md) for the field,
+authentication, and caller differences between the content APIs.
+
 ### Routes
 
 | Method | Route | Purpose |
